@@ -347,7 +347,7 @@ export default function Stage1Page() {
   }
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-4xl mt-8">
       {/* Header */}
       <div className="mb-8 opacity-0 animate-[slideDown_0.4s_ease-out_forwards]">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">

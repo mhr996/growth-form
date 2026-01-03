@@ -5,6 +5,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
 import { EmailVerificationModal } from "@/components/email-verification-modal";
+import { WelcomeModal } from "@/components/welcome-modal";
 import { DynamicFormField } from "@/components/dynamic-form-field";
 import { createClient } from "@/lib/supabase/client";
 
@@ -34,11 +35,17 @@ export default function Home() {
   const [currentStep, setCurrentStep] = useState(1);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
   const { user, loading } = useAuth();
   const [formFields, setFormFields] = useState<FormFieldData[]>([]);
   const [formValues, setFormValues] = useState<Record<string, any>>({});
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [loadingFields, setLoadingFields] = useState(true);
+  const [stageSettings, setStageSettings] = useState<{
+    welcome_message: string;
+    user_agreement: string;
+  } | null>(null);
 
   // Load form fields from database
   useEffect(() => {
@@ -59,15 +66,41 @@ export default function Home() {
     fetchFields();
   }, [currentStep]);
 
-  // Check if user is authenticated
+  // Load stage settings
+  useEffect(() => {
+    const fetchStageSettings = async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("stage_settings")
+        .select("welcome_message, user_agreement")
+        .eq("stage", currentStep)
+        .single();
+
+      if (!error && data) {
+        setStageSettings(data);
+      }
+    };
+
+    fetchStageSettings();
+  }, [currentStep]);
+
+  // Check if user is authenticated and show appropriate modal
   useEffect(() => {
     if (!loading && !user) {
       setShowVerificationModal(true);
+      setHasAcceptedTerms(false);
+    } else if (!loading && user && !hasAcceptedTerms) {
+      setShowWelcomeModal(true);
     }
-  }, [user, loading]);
+  }, [user, loading, hasAcceptedTerms]);
 
   const handleVerified = () => {
     setShowVerificationModal(false);
+  };
+
+  const handleAcceptTerms = () => {
+    setHasAcceptedTerms(true);
+    setShowWelcomeModal(false);
   };
 
   const validateForm = () => {
@@ -191,6 +224,16 @@ export default function Home() {
         isOpen={showVerificationModal}
         onVerified={handleVerified}
       />
+
+      {/* Welcome Modal */}
+      {stageSettings && (
+        <WelcomeModal
+          isOpen={showWelcomeModal}
+          onAccept={handleAcceptTerms}
+          welcomeMessage={stageSettings.welcome_message || ""}
+          userAgreement={stageSettings.user_agreement || ""}
+        />
+      )}
 
       {/* Animated Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-white to-blue-50"></div>
@@ -370,8 +413,8 @@ export default function Home() {
 
             {/* Form */}
             <div className="px-6 sm:px-10 py-10">
-              {!user ? (
-                // Show skeleton/loading state when not authenticated
+              {!user || !hasAcceptedTerms ? (
+                // Show skeleton/loading state when not authenticated or terms not accepted
                 <div className="space-y-6">
                   <div className="animate-pulse">
                     <div className="h-4 bg-gray-200 rounded w-1/4 mb-3"></div>

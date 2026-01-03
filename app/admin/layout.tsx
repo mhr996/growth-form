@@ -76,7 +76,7 @@ export default function AdminLayout({
             {/* Logo */}
             <div className="p-6 border-b border-gray-100">
               <div className="flex items-center gap-3">
-                <div className="relative w-12 h-12">
+                <div className="relative w-14 h-12">
                   <Image
                     src="/logo.webp"
                     alt="Growth Plus"
@@ -88,7 +88,6 @@ export default function AdminLayout({
                   <h1 className="font-bold text-lg text-gray-900">
                     Growth Plus
                   </h1>
-                  <p className="text-xs text-gray-500">لوحة التحكم</p>
                 </div>
               </div>
             </div>
