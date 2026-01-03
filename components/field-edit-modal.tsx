@@ -41,6 +41,7 @@ interface FormField {
   weight?: number | null;
   is_ai_calculated?: boolean;
   full_width?: boolean;
+  ai_prompt?: string | null;
 }
 
 export function FieldEditModal({
@@ -236,16 +237,42 @@ export function FieldEditModal({
                   </div>
                 )}
                 {formData.is_ai_calculated && (
-                  <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
-                    <p className="text-sm text-blue-900 flex items-center gap-2">
-                      <Lightbulb className="w-5 h-5 text-blue-600" />
-                      <span className="font-semibold">
-                        هذا السؤال يتم تقييمه بواسطة الذكاء الاصطناعي
-                      </span>
-                    </p>
-                    <p className="text-xs text-blue-700 mt-2">
-                      لا يمكن تعيين وزن يدوي لهذا الحقل حيث سيتم حسابه تلقائياً
-                    </p>
+                  <div className="space-y-3">
+                    <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+                      <p className="text-sm text-blue-900 flex items-center gap-2">
+                        <Lightbulb className="w-5 h-5 text-blue-600" />
+                        <span className="font-semibold">
+                          هذا السؤال يتم تقييمه بواسطة الذكاء الاصطناعي
+                        </span>
+                      </p>
+                      <p className="text-xs text-blue-700 mt-2">
+                        لا يمكن تعيين وزن يدوي لهذا الحقل حيث سيتم حسابه
+                        تلقائياً
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                        <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                        Prompt للذكاء الاصطناعي
+                      </label>
+                      <textarea
+                        value={formData.ai_prompt || ""}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            ai_prompt: e.target.value,
+                          })
+                        }
+                        rows={4}
+                        className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all resize-none hover:border-gray-300"
+                        placeholder="اكتب التعليمات التي سيتم إرسالها للذكاء الاصطناعي لتقييم هذا السؤال..."
+                      />
+                      <p className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg flex items-center gap-2">
+                        <Lightbulb className="w-4 h-4 text-purple-500" />
+                        سيتم استخدام هذا الـ Prompt لتوجيه الذكاء الاصطناعي في
+                        تقييم إجابة المتقدم على هذا السؤال
+                      </p>
+                    </div>
                   </div>
                 )}
                 {(formData.field_type === "select" ||

@@ -49,6 +49,7 @@ interface FormField {
   is_ai_calculated?: boolean;
   full_width?: boolean;
   question_title?: string | null;
+  ai_prompt?: string | null;
 }
 
 function SortableField({
