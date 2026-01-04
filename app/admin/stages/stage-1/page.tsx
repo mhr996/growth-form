@@ -46,10 +46,11 @@ interface FormField {
   display_order: number;
   is_required: boolean;
   weight?: number | null;
+  has_weight?: boolean;
   is_ai_calculated?: boolean;
   full_width?: boolean;
   question_title?: string | null;
-  ai_prompt?: string | null;
+  ai_prompt?: any;
 }
 
 function SortableField({
@@ -151,6 +152,20 @@ function SortableField({
               <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 bg-gradient-to-r from-[#2A3984]/10 to-[#3a4a9f]/10 text-[#2A3984] rounded-full font-semibold border border-[#2A3984]/20">
                 {field.field_type}
               </span>
+              {field.has_weight &&
+                (field.field_type === "select" ||
+                  field.field_type === "radio") && (
+                  <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-full font-semibold shadow-sm">
+                    <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
+                    له أوزان
+                  </span>
+                )}
+              {field.is_ai_calculated && (
+                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full font-semibold shadow-sm">
+                  <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
+                  AI
+                </span>
+              )}
             </div>
 
             {field.placeholder && (
@@ -273,6 +288,9 @@ export default function Stage1Page() {
           placeholder: updatedField.placeholder,
           tooltip: updatedField.tooltip,
           is_required: updatedField.is_required,
+          options: updatedField.options,
+          has_weight: updatedField.has_weight,
+          ai_prompt: updatedField.ai_prompt,
         })
         .eq("id", updatedField.id);
 
@@ -516,6 +534,7 @@ export default function Stage1Page() {
         onClose={() => setIsModalOpen(false)}
         field={editingField}
         onSave={handleSaveField}
+        allFields={fields}
       />
     </div>
   );

@@ -5,21 +5,21 @@ import Link from "next/link";
 import { Edit, Mail, CheckCircle2, Settings } from "lucide-react";
 
 const tabs = [
-  { name: "تعديل الحقول", href: "/admin/stages/stage-1", icon: Edit },
-  { name: "رسالة الترحيب", href: "/admin/stages/stage-1/welcome", icon: Mail },
+  { name: "تعديل الحقول", href: "/admin/stages/stage-2", icon: Edit },
+  { name: "رسالة الترحيب", href: "/admin/stages/stage-2/welcome", icon: Mail },
   {
     name: "رسالة النجاح",
-    href: "/admin/stages/stage-1/success",
+    href: "/admin/stages/stage-2/success",
     icon: CheckCircle2,
   },
   {
     name: "إعدادات المرحلة",
-    href: "/admin/stages/stage-1/settings",
+    href: "/admin/stages/stage-2/settings",
     icon: Settings,
   },
 ];
 
-export default function Stage1Layout({
+export default function Stage2Layout({
   children,
 }: {
   children: React.ReactNode;

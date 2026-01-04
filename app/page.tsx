@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
 import { EmailVerificationModal } from "@/components/email-verification-modal";
 import { WelcomeModal } from "@/components/welcome-modal";
+import { SuccessModal } from "@/components/success-modal";
 import { DynamicFormField } from "@/components/dynamic-form-field";
 import { createClient } from "@/lib/supabase/client";
 
@@ -29,14 +30,19 @@ interface FormFieldData {
   stage: number;
   full_width?: boolean;
   is_ai_calculated?: boolean;
+  has_weight?: boolean;
 }
 
 export default function Home() {
   const [currentStep, setCurrentStep] = useState(1);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
+  const [isFormLocked, setIsFormLocked] = useState(false);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [checkingSubmission, setCheckingSubmission] = useState(false);
   const { user, loading } = useAuth();
   const [formFields, setFormFields] = useState<FormFieldData[]>([]);
   const [formValues, setFormValues] = useState<Record<string, any>>({});
@@ -45,10 +51,49 @@ export default function Home() {
   const [stageSettings, setStageSettings] = useState<{
     welcome_message: string;
     user_agreement: string;
+    success_message: string;
   } | null>(null);
 
-  // Load form fields from database
+  // Check if user has already submitted (do this FIRST before showing welcome modal)
   useEffect(() => {
+    const checkSubmission = async () => {
+      if (!user?.email) {
+        setCheckingSubmission(false);
+        return;
+      }
+
+      setCheckingSubmission(true);
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("form_submissions")
+        .select("id")
+        .eq("user_email", user.email)
+        .eq("stage", currentStep)
+        .maybeSingle();
+
+      if (!error && data) {
+        setHasSubmitted(true);
+        setIsFormLocked(true);
+        setHasAcceptedTerms(true); // Skip welcome modal
+        setShowWelcomeModal(false); // Ensure modal is closed
+        setLoadingFields(true); // Keep skeleton visible for locked state
+      }
+      setCheckingSubmission(false);
+    };
+
+    if (user && !loading) {
+      checkSubmission();
+    }
+  }, [user, loading, currentStep]);
+
+  // Load form fields from database (only if form is not locked)
+  useEffect(() => {
+    // Don't load fields if form is locked - keep showing skeleton
+    if (isFormLocked) {
+      setLoadingFields(true);
+      return;
+    }
+
     const fetchFields = async () => {
       const supabase = createClient();
       const { data, error } = await supabase
@@ -63,8 +108,11 @@ export default function Home() {
       setLoadingFields(false);
     };
 
-    fetchFields();
-  }, [currentStep]);
+    // Only fetch if user is authenticated and accepted terms
+    if (user && hasAcceptedTerms && !isFormLocked) {
+      fetchFields();
+    }
+  }, [currentStep, user, hasAcceptedTerms, isFormLocked]);
 
   // Load stage settings
   useEffect(() => {
@@ -72,7 +120,7 @@ export default function Home() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("stage_settings")
-        .select("welcome_message, user_agreement")
+        .select("welcome_message, user_agreement, success_message")
         .eq("stage", currentStep)
         .single();
 
@@ -89,10 +137,17 @@ export default function Home() {
     if (!loading && !user) {
       setShowVerificationModal(true);
       setHasAcceptedTerms(false);
-    } else if (!loading && user && !hasAcceptedTerms) {
+    } else if (
+      !loading &&
+      user &&
+      !hasAcceptedTerms &&
+      !isFormLocked &&
+      !checkingSubmission
+    ) {
+      // Only show welcome modal if user hasn't submitted and we've finished checking
       setShowWelcomeModal(true);
     }
-  }, [user, loading, hasAcceptedTerms]);
+  }, [user, loading, hasAcceptedTerms, isFormLocked, checkingSubmission]);
 
   const handleVerified = () => {
     setShowVerificationModal(false);
@@ -145,12 +200,21 @@ export default function Home() {
           ] = `${field.label} يجب ألا يتجاوز ${rules.maxLength} حرف`;
         }
 
-        // Pattern
-        if (rules.pattern) {
+        // Pattern (skip for phone numbers as we handle them separately)
+        if (rules.pattern && field.field_type !== "tel") {
           const regex = new RegExp(rules.pattern);
           if (!regex.test(value)) {
             errors[field.field_name] =
               rules.errorMessage || `${field.label} غير صحيح`;
+          }
+        }
+
+        // Phone number validation - only digits and minimum 10 digits
+        if (field.field_type === "tel") {
+          const digitsOnly = value.replace(/\D/g, "");
+          if (digitsOnly.length < 10) {
+            errors[field.field_name] =
+              "رقم الجوال يجب أن يحتوي على 10 أرقام على الأقل";
           }
         }
 
@@ -175,29 +239,73 @@ export default function Home() {
       return;
     }
 
+    // Prevent submission if already submitted
+    if (isFormLocked) {
+      alert("لقد قمت بإرسال النموذج مسبقاً");
+      return;
+    }
+
     console.log("Form Data:", formValues);
 
     const supabase = createClient();
 
     try {
-      const { error } = await supabase.from("form_submissions").insert([
-        {
-          user_email: user?.email,
-          stage: currentStep,
-          data: formValues,
-        },
-      ]);
+      // Calculate score based on weighted fields
+      let totalScore = 0;
+      formFields.forEach((field) => {
+        // Only calculate for fields with weights enabled
+        if (field.has_weight && field.options?.options) {
+          const userAnswer = formValues[field.field_name];
+          if (userAnswer) {
+            // Find the selected option and get its weight
+            const selectedOption = field.options.options.find(
+              (opt: any) => opt.value === userAnswer
+            );
+            if (selectedOption && selectedOption.weight) {
+              totalScore += selectedOption.weight;
+            }
+          }
+        }
+      });
+
+      console.log("Calculated Score:", totalScore);
+
+      const { data: submission, error } = await supabase
+        .from("form_submissions")
+        .insert([
+          {
+            user_email: user?.email,
+            stage: currentStep,
+            data: formValues,
+            score: totalScore,
+          },
+        ])
+        .select()
+        .single();
 
       if (error) throw error;
 
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
+      // Lock the form and show success modal immediately
+      setIsFormLocked(true);
+      setHasSubmitted(true);
+      setShowSuccessModal(true);
 
-      // Move to next step or finish
-      if (currentStep < 3) {
-        setCurrentStep(currentStep + 1);
-        setFormValues({});
-        setFormErrors({});
+      // Trigger async AI evaluation for Stage 1 only (don't wait for it)
+      if (currentStep === 1 && submission?.id) {
+        fetch("/api/evaluate-submission", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            submissionId: submission.id,
+            userEmail: user?.email,
+            formData: formValues,
+          }),
+        }).catch((err) => {
+          // Log error but don't affect user experience
+          console.error("AI evaluation failed (background process):", err);
+        });
       }
     } catch (error) {
       console.error("Error saving form:", error);
@@ -232,6 +340,15 @@ export default function Home() {
           onAccept={handleAcceptTerms}
           welcomeMessage={stageSettings.welcome_message || ""}
           userAgreement={stageSettings.user_agreement || ""}
+        />
+      )}
+
+      {/* Success Modal */}
+      {stageSettings && (
+        <SuccessModal
+          isOpen={showSuccessModal}
+          onClose={() => setShowSuccessModal(false)}
+          message={stageSettings.success_message || ""}
         />
       )}
 
@@ -440,7 +557,7 @@ export default function Home() {
                   {/* Overlay message */}
                   <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-3xl">
                     <div className="text-center p-8 bg-white rounded-2xl shadow-xl border-2 border-[#2A3984]/20">
-                      <div className="w-16 h-16 bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] rounded-full flex items-center justify-center mx-auto mb-4">
+                      <div className="w-16 h-16 bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] rounded-full flex items-center justify-center mx-auto">
                         <svg
                           className="w-8 h-8 text-white"
                           fill="none"
@@ -455,18 +572,12 @@ export default function Home() {
                           />
                         </svg>
                       </div>
-                      <p className="text-lg font-bold text-gray-900 mb-2">
-                        يرجى التحقق من بريدك الإلكتروني
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        للوصول إلى النموذج
-                      </p>
                     </div>
                   </div>
                 </div>
               ) : loadingFields ? (
                 // Loading fields from database
-                <div className="space-y-6">
+                <div className="space-y-6 relative">
                   <div className="animate-pulse">
                     <div className="h-4 bg-gray-200 rounded w-1/4 mb-3"></div>
                     <div className="h-14 bg-gray-200 rounded-xl"></div>
@@ -475,16 +586,72 @@ export default function Home() {
                     <div className="h-4 bg-gray-200 rounded w-1/3 mb-3"></div>
                     <div className="h-14 bg-gray-200 rounded-xl"></div>
                   </div>
+                  {isFormLocked && (
+                    <div className="absolute inset-0  backdrop-blur-sm rounded-3xl z-10 flex items-center justify-center">
+                      <div className="text-center p-8 bg-white rounded-2xl shadow-xl border-2 border-green-500/30">
+                        <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <svg
+                            className="w-12 h-12 text-white"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={3}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-800 mb-2">
+                          تم الإرسال مسبقاً
+                        </h3>
+                        <p className="text-gray-600">
+                          لقد قمت بإرسال هذا النموذج بالفعل
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 // Show actual form when authenticated and fields loaded
                 <motion.form
                   onSubmit={onSubmit}
-                  className="space-y-6"
+                  className="space-y-6 relative"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.3 }}
                 >
+                  {/* Form Locked Overlay */}
+                  {isFormLocked && (
+                    <div className="absolute inset-0 backdrop-blur-sm rounded-3xl z-10 flex items-center justify-center">
+                      <div className="text-center p-8 bg-white rounded-2xl shadow-xl border-2 border-green-500/30">
+                        <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <svg
+                            className="w-12 h-12 text-white"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={3}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-800 mb-2">
+                          تم الإرسال مسبقاً
+                        </h3>
+                        <p className="text-gray-600">
+                          لقد قمت بإرسال هذا النموذج بالفعل
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Dynamic Fields - 2 columns grid with full-width support */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {formFields.map((field) => {
@@ -538,11 +705,16 @@ export default function Home() {
                   {/* Submit Button */}
                   <motion.button
                     type="submit"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="w-full mt-8 px-8 py-5 rounded-xl bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] text-white font-bold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 flex items-center justify-center gap-3"
+                    disabled={isFormLocked}
+                    whileHover={{ scale: isFormLocked ? 1 : 1.02 }}
+                    whileTap={{ scale: isFormLocked ? 1 : 0.98 }}
+                    className={`w-full mt-8 px-8 py-5 rounded-xl font-bold text-lg shadow-xl transition-all duration-300 flex items-center justify-center gap-3 ${
+                      isFormLocked
+                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                        : "bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] text-white hover:shadow-2xl"
+                    }`}
                   >
-                    <span>التالي</span>
+                    <span>إرسال</span>
                     <svg
                       className="w-6 h-6"
                       fill="none"

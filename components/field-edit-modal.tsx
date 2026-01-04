@@ -17,14 +17,17 @@ import {
   Check,
   Square,
   Save,
+  Sparkles,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { AIPromptBuilderModal } from "./ai-prompt-builder-modal";
 
 interface FieldEditModalProps {
   isOpen: boolean;
   onClose: () => void;
   field: FormField | null;
   onSave: (field: FormField) => void;
+  allFields?: FormField[];
 }
 
 interface FormField {
@@ -39,9 +42,10 @@ interface FormField {
   display_order: number;
   is_required: boolean;
   weight?: number | null;
+  has_weight?: boolean;
   is_ai_calculated?: boolean;
   full_width?: boolean;
-  ai_prompt?: string | null;
+  ai_prompt?: any;
 }
 
 export function FieldEditModal({
@@ -49,8 +53,10 @@ export function FieldEditModal({
   onClose,
   field,
   onSave,
+  allFields = [],
 }: FieldEditModalProps) {
   const [formData, setFormData] = useState<FormField | null>(null);
+  const [showAIPromptBuilder, setShowAIPromptBuilder] = useState(false);
 
   useEffect(() => {
     if (field) {
@@ -60,8 +66,48 @@ export function FieldEditModal({
 
   if (!formData) return null;
 
+  // Calculate total weight for options
+  const getTotalWeight = () => {
+    if (!formData.options?.options) return 0;
+    return formData.options.options.reduce(
+      (sum: number, opt: any) => sum + (opt.weight ?? 0),
+      0
+    );
+  };
+
+  // Auto-distribute weights evenly
+  const autoDistributeWeights = (options: any[]) => {
+    const count = options.length;
+    if (count === 0) return options;
+
+    const baseWeight = Math.floor(100 / count);
+    const remainder = 100 - baseWeight * count;
+
+    return options.map((opt: any, index: number) => ({
+      ...opt,
+      weight: baseWeight + (index < remainder ? 1 : 0),
+    }));
+  };
+
+  const totalWeight = getTotalWeight();
+  const isWeightValid = totalWeight === 100;
+  const isSelectOrRadio =
+    formData.field_type === "select" || formData.field_type === "radio";
+
+  // Check if field has 2+ options (only then can it have weights)
+  const hasMultipleOptions = (formData.options?.options || []).length >= 2;
+  const shouldShowWeights = isSelectOrRadio && hasMultipleOptions;
+
   const handleSave = () => {
-    onSave(formData);
+    // Automatically set has_weight based on number of options
+    const hasMultipleOptions = (formData.options?.options || []).length >= 2;
+
+    const updatedFormData = {
+      ...formData,
+      has_weight: isSelectOrRadio && hasMultipleOptions,
+    };
+
+    onSave(updatedFormData);
     onClose();
   };
 
@@ -203,39 +249,6 @@ export function FieldEditModal({
                   />
                 </div>
 
-                {/* Weight */}
-                {!formData.is_ai_calculated && (
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                      الوزن / الأهمية{" "}
-                      <span className="text-gray-400 font-normal">(1-10)</span>
-                    </label>
-                    <div className="flex items-center gap-4">
-                      <input
-                        type="range"
-                        min="1"
-                        max="10"
-                        value={formData.weight || 1}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            weight: parseInt(e.target.value),
-                          })
-                        }
-                        className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#2A3984]"
-                      />
-                      <div className="w-16 h-12 flex items-center justify-center bg-[#2A3984] text-white text-xl font-bold rounded-xl shadow-lg">
-                        {formData.weight || 1}
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg flex items-center gap-2">
-                      <Lightbulb className="w-4 h-4 text-amber-500" />
-                      يستخدم لتحديد أهمية الحقل في التقييم (1 = أقل أهمية، 10 =
-                      أعلى أهمية)
-                    </p>
-                  </div>
-                )}
                 {formData.is_ai_calculated && (
                   <div className="space-y-3">
                     <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
@@ -255,22 +268,36 @@ export function FieldEditModal({
                         <span className="w-2 h-2 rounded-full bg-purple-500"></span>
                         Prompt للذكاء الاصطناعي
                       </label>
-                      <textarea
-                        value={formData.ai_prompt || ""}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            ai_prompt: e.target.value,
-                          })
-                        }
-                        rows={4}
-                        className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all resize-none hover:border-gray-300"
-                        placeholder="اكتب التعليمات التي سيتم إرسالها للذكاء الاصطناعي لتقييم هذا السؤال..."
-                      />
+
+                      <div className="relative">
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => setShowAIPromptBuilder(true)}
+                          className="w-full px-6 py-4 bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-xl hover:border-purple-400 transition-all flex items-center justify-center gap-3 group"
+                        >
+                          <Sparkles className="w-5 h-5 text-purple-600 group-hover:animate-pulse" />
+                          <span className="font-bold text-purple-700">
+                            {formData.ai_prompt
+                              ? "تعديل Prompt"
+                              : "بناء Prompt"}
+                          </span>
+                        </motion.button>
+
+                        {formData.ai_prompt && (
+                          <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+                            <Check className="w-4 h-4 text-green-600" />
+                            <span className="text-xs text-green-700 font-semibold">
+                              تم بناء Prompt بنجاح
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
                       <p className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg flex items-center gap-2">
                         <Lightbulb className="w-4 h-4 text-purple-500" />
-                        سيتم استخدام هذا الـ Prompt لتوجيه الذكاء الاصطناعي في
-                        تقييم إجابة المتقدم على هذا السؤال
+                        استخدم أداة بناء الـ Prompt لإنشاء تعليمات احترافية مع
+                        جدول معايير تقييم تفصيلي
                       </p>
                     </div>
                   </div>
@@ -278,10 +305,78 @@ export function FieldEditModal({
                 {(formData.field_type === "select" ||
                   formData.field_type === "radio") && (
                   <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                      <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                      الخيارات المتاحة
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                        <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                        الخيارات المتاحة
+                      </label>
+                      {shouldShowWeights && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const options = formData.options?.options || [];
+                            const distributed = autoDistributeWeights(options);
+                            setFormData({
+                              ...formData,
+                              options: {
+                                ...formData.options,
+                                options: distributed,
+                              },
+                            });
+                          }}
+                          className="text-xs px-3 py-1.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors font-semibold"
+                        >
+                          توزيع تلقائي
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Weight Total Indicator - only show if 2+ options */}
+                    {shouldShowWeights && (
+                      <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-2 rounded-xl p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-gray-700">
+                            مجموع الأوزان:
+                          </span>
+                          <span
+                            className={`text-2xl font-bold ${
+                              isWeightValid ? "text-green-600" : "text-red-600"
+                            }`}
+                          >
+                            {totalWeight}
+                          </span>
+                        </div>
+                        <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{
+                              width: `${Math.min(totalWeight, 100)}%`,
+                            }}
+                            className={`h-full rounded-full ${
+                              isWeightValid
+                                ? "bg-gradient-to-r from-green-500 to-green-600"
+                                : totalWeight > 100
+                                ? "bg-gradient-to-r from-red-500 to-red-600"
+                                : "bg-gradient-to-r from-amber-500 to-amber-600"
+                            }`}
+                          />
+                        </div>
+                        <p className="text-xs text-gray-600 flex items-center gap-1.5">
+                          {isWeightValid ? (
+                            <>
+                              <Check className="w-4 h-4 text-green-600" />
+                              ممتاز! المجموع يساوي 100
+                            </>
+                          ) : (
+                            <>
+                              <Lightbulb className="w-4 h-4 text-amber-500" />
+                              يجب أن يكون مجموع الأوزان = 100 بالضبط
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    )}
+
                     <div className="space-y-3 bg-gray-50 p-4 rounded-xl border-2 border-gray-200">
                       {(formData.options?.options || []).map(
                         (option: any, index: number) => (
@@ -339,9 +434,14 @@ export function FieldEditModal({
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
                                 onClick={() => {
-                                  const newOptions = (
+                                  let newOptions = (
                                     formData.options?.options || []
                                   ).filter((_: any, i: number) => i !== index);
+
+                                  // Auto-distribute weights after deletion
+                                  newOptions =
+                                    autoDistributeWeights(newOptions);
+
                                   setFormData({
                                     ...formData,
                                     options: {
@@ -355,36 +455,38 @@ export function FieldEditModal({
                                 <Trash2 className="w-5 h-5" />
                               </motion.button>
                             </div>
-                            <div className="flex items-center gap-3 pr-10">
-                              <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">
-                                الوزن:
-                              </label>
-                              <input
-                                type="range"
-                                min="1"
-                                max="10"
-                                value={option.weight || 1}
-                                onChange={(e) => {
-                                  const newOptions = [
-                                    ...(formData.options?.options || []),
-                                  ];
-                                  newOptions[index].weight = parseInt(
-                                    e.target.value
-                                  );
-                                  setFormData({
-                                    ...formData,
-                                    options: {
-                                      ...formData.options,
-                                      options: newOptions,
-                                    },
-                                  });
-                                }}
-                                className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#2A3984]"
-                              />
-                              <div className="w-10 h-8 flex items-center justify-center bg-[#2A3984] text-white text-sm font-bold rounded-lg">
-                                {option.weight || 1}
+                            {shouldShowWeights && (
+                              <div className="flex items-center gap-3 pr-10">
+                                <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">
+                                  الوزن:
+                                </label>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="100"
+                                  value={option.weight ?? 0}
+                                  onChange={(e) => {
+                                    const newOptions = [
+                                      ...(formData.options?.options || []),
+                                    ];
+                                    newOptions[index].weight = parseInt(
+                                      e.target.value
+                                    );
+                                    setFormData({
+                                      ...formData,
+                                      options: {
+                                        ...formData.options,
+                                        options: newOptions,
+                                      },
+                                    });
+                                  }}
+                                  className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#2A3984]"
+                                />
+                                <div className="w-12 h-8 flex items-center justify-center bg-[#2A3984] text-white text-sm font-bold rounded-lg">
+                                  {option.weight ?? 0}
+                                </div>
                               </div>
-                            </div>
+                            )}
                           </motion.div>
                         )
                       )}
@@ -393,10 +495,14 @@ export function FieldEditModal({
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => {
-                          const newOptions = [
+                          let newOptions = [
                             ...(formData.options?.options || []),
-                            { value: "", label: "", weight: 1 },
+                            { value: "", label: "", weight: 0 },
                           ];
+
+                          // Auto-distribute weights after adding
+                          newOptions = autoDistributeWeights(newOptions);
+
                           setFormData({
                             ...formData,
                             options: {
@@ -460,12 +566,22 @@ export function FieldEditModal({
                 </motion.button>
                 <motion.button
                   whileHover={{
-                    scale: 1.05,
-                    boxShadow: "0 10px 30px rgba(42, 57, 132, 0.3)",
+                    scale: !isSelectOrRadio || isWeightValid ? 1.05 : 1,
+                    boxShadow:
+                      !isSelectOrRadio || isWeightValid
+                        ? "0 10px 30px rgba(42, 57, 132, 0.3)"
+                        : undefined,
                   }}
-                  whileTap={{ scale: 0.95 }}
+                  whileTap={{
+                    scale: !isSelectOrRadio || isWeightValid ? 0.95 : 1,
+                  }}
                   onClick={handleSave}
-                  className="px-8 py-3 rounded-xl font-bold bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] text-white shadow-xl transition-all flex items-center gap-2"
+                  disabled={isSelectOrRadio && !isWeightValid}
+                  className={`px-8 py-3 rounded-xl font-bold shadow-xl transition-all flex items-center gap-2 ${
+                    isSelectOrRadio && !isWeightValid
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : "bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] text-white"
+                  }`}
                 >
                   <span>حفظ التغييرات</span>
                   <Save className="w-5 h-5" />
@@ -475,6 +591,37 @@ export function FieldEditModal({
           </div>
         </>
       )}
+
+      {/* AI Prompt Builder Modal */}
+      <AIPromptBuilderModal
+        isOpen={showAIPromptBuilder}
+        onClose={() => setShowAIPromptBuilder(false)}
+        initialPrompt={
+          typeof formData?.ai_prompt === "object"
+            ? JSON.stringify(formData.ai_prompt)
+            : formData?.ai_prompt || ""
+        }
+        onSave={(promptData) => {
+          if (formData) {
+            setFormData({
+              ...formData,
+              ai_prompt: promptData,
+            });
+          }
+        }}
+        availableQuestions={allFields
+          .filter(
+            (f) => f.is_ai_calculated && f.ai_prompt && f.id !== formData?.id
+          )
+          .map((f) => ({
+            id: f.id,
+            label: f.label,
+            ai_prompt:
+              typeof f.ai_prompt === "object"
+                ? JSON.stringify(f.ai_prompt)
+                : f.ai_prompt || undefined,
+          }))}
+      />
     </AnimatePresence>
   );
 }

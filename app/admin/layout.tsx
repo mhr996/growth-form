@@ -97,8 +97,8 @@ export default function AdminLayout({
               {navigation.map((item) => {
                 if (item.children) {
                   // Expandable menu item
-                  const hasActiveChild = item.children.some(
-                    (child) => pathname === child.href
+                  const hasActiveChild = item.children.some((child) =>
+                    pathname.startsWith(child.href)
                   );
                   return (
                     <div key={item.name}>
@@ -134,7 +134,7 @@ export default function AdminLayout({
                       >
                         <div className="pr-6 pt-1 space-y-1">
                           {item.children.map((child) => {
-                            const isActive = pathname === child.href;
+                            const isActive = pathname.startsWith(child.href);
                             return (
                               <Link
                                 key={child.name}
@@ -248,8 +248,8 @@ export default function AdminLayout({
               {navigation.map((item) => {
                 if (item.children) {
                   // Expandable menu item
-                  const hasActiveChild = item.children.some(
-                    (child) => pathname === child.href
+                  const hasActiveChild = item.children.some((child) =>
+                    pathname.startsWith(child.href)
                   );
                   return (
                     <div key={item.name}>
@@ -285,7 +285,7 @@ export default function AdminLayout({
                       >
                         <div className="pr-6 pt-1 space-y-1">
                           {item.children.map((child) => {
-                            const isActive = pathname === child.href;
+                            const isActive = pathname.startsWith(child.href);
                             return (
                               <Link
                                 key={child.name}
