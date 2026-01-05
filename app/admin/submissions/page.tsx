@@ -733,10 +733,10 @@ export default function SubmissionsPage() {
           </p>
         </motion.div>
       ) : (
-        <div className="bg-white rounded-2xl max-w-[1200px] shadow-lg overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden max-w-[1200px] 2xl:max-w-full">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] text-white">
+              <thead className="bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] text-white sticky top-0 z-10">
                 <tr>
                   <th className="px-6 py-4 text-center">
                     <input

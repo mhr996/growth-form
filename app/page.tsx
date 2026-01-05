@@ -12,9 +12,9 @@ import { DynamicFormField } from "@/components/dynamic-form-field";
 import { createClient } from "@/lib/supabase/client";
 
 const STEPS = [
-  { id: 1, label: "المعلومات الأساسية" },
-  { id: 2, label: "الخطوة الثانية" },
-  { id: 3, label: "الخطوة الثالثة" },
+  { id: 1, label: "المعلومات الأساسية والموائمة" },
+  { id: 2, label: "الجدارات الأساسية" },
+  { id: 3, label: "التحدي الريادي" },
 ];
 
 interface FormFieldData {
