@@ -211,11 +211,13 @@ export function DynamicFormField({
             </button>
             <div
               className={
-                `fixed sm:absolute left-1/2 sm:left-1/2 top-1/2 sm:top-auto sm:bottom-full ` +
-                `-translate-x-1/2 -translate-y-1/2 sm:translate-y-0 ` +
+                `fixed sm:absolute left-1/2 sm:left-1/2 top-20 sm:top-auto sm:bottom-full ` +
+                `-translate-x-1/2 sm:translate-y-0 ` +
                 `w-[calc(100vw-2rem)] sm:w-56 max-w-xs p-3 ` +
                 `bg-gradient-to-br from-gray-900 to-gray-800 text-white text-xs rounded-lg ` +
-                `${isTooltipOpen ? "opacity-100 visible" : "opacity-0 invisible"} ` +
+                `${
+                  isTooltipOpen ? "opacity-100 visible" : "opacity-0 invisible"
+                } ` +
                 `group-hover:opacity-100 group-hover:visible sm:mb-2 transition-all duration-200 ` +
                 `z-50 shadow-2xl border border-white/10`
               }
