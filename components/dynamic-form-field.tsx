@@ -201,7 +201,7 @@ export function DynamicFormField({
         {field.tooltip && (
           <div className="group relative">
             <Info className="w-4 h-4 text-blue-400 cursor-help" />
-            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-56 p-3 bg-gradient-to-br from-gray-900 to-gray-800 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 shadow-2xl border border-white/10">
+            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 sm:w-56 w-[calc(100vw-3rem)] max-w-xs p-3 bg-gradient-to-br from-gray-900 to-gray-800 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 shadow-2xl border border-white/10">
               <div className="whitespace-pre-line leading-relaxed">
                 {field.tooltip}
               </div>
