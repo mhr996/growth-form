@@ -40,6 +40,7 @@ export function DynamicFormField({
 }: DynamicFieldProps) {
   const supabase = createClient();
   const [wordCount, setWordCount] = useState(0);
+  const [isTooltipOpen, setIsTooltipOpen] = useState(false);
 
   // Calculate word count for textarea fields
   useEffect(() => {
@@ -200,12 +201,28 @@ export function DynamicFormField({
         </label>
         {field.tooltip && (
           <div className="group relative">
-            <Info className="w-4 h-4 text-blue-400 cursor-help" />
-            <div className="fixed sm:absolute left-1/2 -translate-x-1/2 bottom-4 sm:bottom-full mb-0 sm:mb-2 w-[calc(100vw-2rem)] sm:w-56 max-w-xs p-3 bg-gradient-to-br from-gray-900 to-gray-800 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 shadow-2xl border border-white/10">
+            <button
+              type="button"
+              aria-label="معلومات إضافية"
+              className="p-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-300"
+              onClick={() => setIsTooltipOpen((prev) => !prev)}
+            >
+              <Info className="w-4 h-4 text-blue-400 cursor-pointer" />
+            </button>
+            <div
+              className={
+                `fixed sm:absolute left-1/2 sm:left-1/2 top-1/2 sm:top-auto sm:bottom-full ` +
+                `-translate-x-1/2 -translate-y-1/2 sm:translate-y-0 ` +
+                `w-[calc(100vw-2rem)] sm:w-56 max-w-xs p-3 ` +
+                `bg-gradient-to-br from-gray-900 to-gray-800 text-white text-xs rounded-lg ` +
+                `${isTooltipOpen ? "opacity-100 visible" : "opacity-0 invisible"} ` +
+                `group-hover:opacity-100 group-hover:visible sm:mb-2 transition-all duration-200 ` +
+                `z-50 shadow-2xl border border-white/10`
+              }
+            >
               <div className="whitespace-pre-line leading-relaxed">
                 {field.tooltip}
               </div>
-              {/* Arrow pointing down */}
               <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-6 border-r-6 border-t-6 border-l-transparent border-r-transparent border-t-gray-900 hidden sm:block"></div>
             </div>
           </div>
