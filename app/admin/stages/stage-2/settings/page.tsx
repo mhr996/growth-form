@@ -12,6 +12,9 @@ export default function Stage2SettingsPage() {
   const [passedEmailContent, setPassedEmailContent] = useState("");
   const [failedEmailContent, setFailedEmailContent] = useState("");
   const [preStageEmailContent, setPreStageEmailContent] = useState("");
+  const [passedEmailSubject, setPassedEmailSubject] = useState("");
+  const [failedEmailSubject, setFailedEmailSubject] = useState("");
+  const [preStageEmailSubject, setPreStageEmailSubject] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
@@ -39,6 +42,9 @@ export default function Stage2SettingsPage() {
         setPassedEmailContent(data.passed_email_content || "");
         setFailedEmailContent(data.failed_email_content || "");
         setPreStageEmailContent(data.pre_stage_email_content || "");
+        setPassedEmailSubject(data.passed_email_subject || "");
+        setFailedEmailSubject(data.failed_email_subject || "");
+        setPreStageEmailSubject(data.pre_stage_email_subject || "");
       }
     } catch (error) {
       console.error("Error loading settings:", error);
@@ -60,6 +66,8 @@ export default function Stage2SettingsPage() {
           .update({
             passed_email_content: passedEmailContent,
             failed_email_content: failedEmailContent,
+            passed_email_subject: passedEmailSubject,
+            failed_email_subject: failedEmailSubject,
             updated_at: new Date().toISOString(),
           })
           .eq("stage", 2);
@@ -70,6 +78,8 @@ export default function Stage2SettingsPage() {
           stage: 2,
           passed_email_content: passedEmailContent,
           failed_email_content: failedEmailContent,
+          passed_email_subject: passedEmailSubject,
+          failed_email_subject: failedEmailSubject,
         });
 
         if (error) throw error;
@@ -100,6 +110,7 @@ export default function Stage2SettingsPage() {
           .from("stage_settings")
           .update({
             pre_stage_email_content: preStageEmailContent,
+            pre_stage_email_subject: preStageEmailSubject,
             updated_at: new Date().toISOString(),
           })
           .eq("stage", 2);
@@ -109,6 +120,7 @@ export default function Stage2SettingsPage() {
         const { error } = await supabase.from("stage_settings").insert({
           stage: 2,
           pre_stage_email_content: preStageEmailContent,
+          pre_stage_email_subject: preStageEmailSubject,
         });
 
         if (error) throw error;
@@ -132,10 +144,10 @@ export default function Stage2SettingsPage() {
   };
 
   const handleSendPreStageEmail = async () => {
-    if (!preStageEmailContent.trim()) {
+    if (!preStageEmailContent.trim() || !preStageEmailSubject.trim()) {
       setMessage({
         type: "error",
-        text: "يرجى كتابة محتوى البريد الإلكتروني أولاً",
+        text: "يرجى كتابة عنوان ومحتوى البريد الإلكتروني أولاً",
       });
       setTimeout(() => setMessage(null), 3000);
       return;
@@ -145,7 +157,7 @@ export default function Stage2SettingsPage() {
     try {
       const { data: submissions, error: fetchError } = await supabase
         .from("form_submissions")
-        .select("email")
+        .select("user_email")
         .eq("stage", 2);
 
       if (fetchError) throw fetchError;
@@ -157,16 +169,37 @@ export default function Stage2SettingsPage() {
         return;
       }
 
+      // Extract unique emails
+      const emails = [...new Set(submissions.map((s) => s.user_email))];
+
+      // Send emails via API
+      const response = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: emails,
+          subject: preStageEmailSubject,
+          content: preStageEmailContent,
+          stage: 2,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to send emails");
+      }
+
       setMessage({
         type: "success",
-        text: `سيتم إرسال البريد الإلكتروني إلى ${submissions.length} مستخدم قريباً`,
+        text: `تم إرسال البريد الإلكتروني إلى ${emails.length} مستخدم بنجاح!`,
       });
       setTimeout(() => setMessage(null), 3000);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error sending emails:", error);
       setMessage({
         type: "error",
-        text: "فشل إرسال البريد الإلكتروني. حاول مرة أخرى.",
+        text: `فشل إرسال البريد الإلكتروني: ${error.message}`,
       });
       setTimeout(() => setMessage(null), 3000);
     } finally {
@@ -283,13 +316,32 @@ export default function Stage2SettingsPage() {
               <p className="text-sm text-gray-600 mb-4">
                 هذا البريد سيتم إرساله لجميع المستخدمين في هذه المرحلة
               </p>
-              <textarea
-                value={preStageEmailContent}
-                onChange={(e) => setPreStageEmailContent(e.target.value)}
-                rows={12}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all resize-none"
-                placeholder="اكتب محتوى البريد الإلكتروني هنا..."
-              />
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    عنوان البريد الإلكتروني
+                  </label>
+                  <input
+                    type="text"
+                    value={preStageEmailSubject}
+                    onChange={(e) => setPreStageEmailSubject(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all"
+                    placeholder="مثال: إعلان هام عن المرحلة الثانية"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    محتوى البريد الإلكتروني
+                  </label>
+                  <textarea
+                    value={preStageEmailContent}
+                    onChange={(e) => setPreStageEmailContent(e.target.value)}
+                    rows={12}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all resize-none"
+                    placeholder="اكتب محتوى البريد الإلكتروني هنا..."
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Action Buttons */}
@@ -352,13 +404,32 @@ export default function Stage2SettingsPage() {
               <p className="text-sm text-gray-600 mb-4">
                 هذا البريد سيتم إرساله للمستخدمين الذين اجتازوا المرحلة بنجاح
               </p>
-              <textarea
-                value={passedEmailContent}
-                onChange={(e) => setPassedEmailContent(e.target.value)}
-                rows={8}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all resize-none"
-                placeholder="اكتب محتوى البريد الإلكتروني هنا..."
-              />
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    عنوان البريد الإلكتروني
+                  </label>
+                  <input
+                    type="text"
+                    value={passedEmailSubject}
+                    onChange={(e) => setPassedEmailSubject(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all"
+                    placeholder="مثال: مبروك! تم قبولك للمرحلة التالية"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    محتوى البريد الإلكتروني
+                  </label>
+                  <textarea
+                    value={passedEmailContent}
+                    onChange={(e) => setPassedEmailContent(e.target.value)}
+                    rows={8}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all resize-none"
+                    placeholder="اكتب محتوى البريد الإلكتروني هنا..."
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Failed Users Email */}
@@ -369,13 +440,32 @@ export default function Stage2SettingsPage() {
               <p className="text-sm text-gray-600 mb-4">
                 هذا البريد سيتم إرساله للمستخدمين الذين لم يجتازوا المرحلة
               </p>
-              <textarea
-                value={failedEmailContent}
-                onChange={(e) => setFailedEmailContent(e.target.value)}
-                rows={8}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all resize-none"
-                placeholder="اكتب محتوى البريد الإلكتروني هنا..."
-              />
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    عنوان البريد الإلكتروني
+                  </label>
+                  <input
+                    type="text"
+                    value={failedEmailSubject}
+                    onChange={(e) => setFailedEmailSubject(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all"
+                    placeholder="مثال: نأسف، لم يتم قبولك في هذه المرحلة"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    محتوى البريد الإلكتروني
+                  </label>
+                  <textarea
+                    value={failedEmailContent}
+                    onChange={(e) => setFailedEmailContent(e.target.value)}
+                    rows={8}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all resize-none"
+                    placeholder="اكتب محتوى البريد الإلكتروني هنا..."
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Save Button */}
