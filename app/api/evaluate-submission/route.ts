@@ -41,11 +41,11 @@ async function evaluateWithRetry(
           {
             role: "system",
             content:
-              "You are an expert evaluator. Respond with valid JSON containing 'score' (number) and 'explanation' (string) fields.",
+              "You are an expert evaluator. Respond with valid JSON containing 'score' (number) and 'explanation' (string) fields. IMPORTANT: Your entire response must be in Arabic. The 'explanation' field must be written in clear, professional Arabic.",
           },
           {
             role: "user",
-            content: `${prompt}\n\nUser's Answer: ${userAnswer}\n\nProvide your evaluation as JSON with 'score' and 'explanation' fields.`,
+            content: `${prompt}\n\nUser's Answer: ${userAnswer}\n\nProvide your evaluation as JSON with 'score' and 'explanation' fields. Remember: Write the explanation in Arabic (اللغة العربية).`,
           },
         ],
       });
@@ -129,8 +129,6 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-
- 
 
     if (!fields || fields.length === 0) {
       // No AI fields to evaluate

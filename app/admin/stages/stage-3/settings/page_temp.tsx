@@ -114,11 +114,17 @@ export default function Stage3SettingsPage() {
         if (error) throw error;
       }
 
-      setMessage({ type: "success", text: "تم حفظ محتوى البريد الإلكتروني بنجاح!" });
+      setMessage({
+        type: "success",
+        text: "تم حفظ محتوى البريد الإلكتروني بنجاح!",
+      });
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {
       console.error("Error saving pre-stage email:", error);
-      setMessage({ type: "error", text: "فشل حفظ محتوى البريد الإلكتروني. حاول مرة أخرى." });
+      setMessage({
+        type: "error",
+        text: "فشل حفظ محتوى البريد الإلكتروني. حاول مرة أخرى.",
+      });
       setTimeout(() => setMessage(null), 3000);
     } finally {
       setSaving(false);
@@ -127,7 +133,10 @@ export default function Stage3SettingsPage() {
 
   const handleSendPreStageEmail = async () => {
     if (!preStageEmailContent.trim()) {
-      setMessage({ type: "error", text: "يرجى كتابة محتوى البريد الإلكتروني أولاً" });
+      setMessage({
+        type: "error",
+        text: "يرجى كتابة محتوى البريد الإلكتروني أولاً",
+      });
       setTimeout(() => setMessage(null), 3000);
       return;
     }
@@ -148,14 +157,17 @@ export default function Stage3SettingsPage() {
         return;
       }
 
-      setMessage({ 
-        type: "success", 
-        text: `سيتم إرسال البريد الإلكتروني إلى ${submissions.length} مستخدم قريباً` 
+      setMessage({
+        type: "success",
+        text: `سيتم إرسال البريد الإلكتروني إلى ${submissions.length} مستخدم قريباً`,
       });
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {
       console.error("Error sending emails:", error);
-      setMessage({ type: "error", text: "فشل إرسال البريد الإلكتروني. حاول مرة أخرى." });
+      setMessage({
+        type: "error",
+        text: "فشل إرسال البريد الإلكتروني. حاول مرة أخرى.",
+      });
       setTimeout(() => setMessage(null), 3000);
     } finally {
       setSending(false);

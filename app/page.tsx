@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { EmailVerificationModal } from "@/components/email-verification-modal";
 import { WelcomeModal } from "@/components/welcome-modal";
 import { SuccessModal } from "@/components/success-modal";
+import { WhatsAppTestModal } from "@/components/whatsapp-test-modal";
 import { DynamicFormField } from "@/components/dynamic-form-field";
 import { createClient } from "@/lib/supabase/client";
 
@@ -39,6 +40,7 @@ export default function Home() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
   const [isFormLocked, setIsFormLocked] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
@@ -605,10 +607,11 @@ export default function Home() {
                           </svg>
                         </div>
                         <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                          تم الإرسال مسبقاً
+                          مرحباً بك مرة أخرى
                         </h3>
                         <p className="text-gray-600">
-                          لقد قمت بإرسال هذا النموذج بالفعل
+                          تم استقبال طلبك مسبقاً، انتظر النتيجة خلال الساعات
+                          القادمة
                         </p>
                       </div>
                     </div>
@@ -643,10 +646,11 @@ export default function Home() {
                           </svg>
                         </div>
                         <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                          تم الإرسال مسبقاً
+                          مرحباً بك مرة أخرى
                         </h3>
                         <p className="text-gray-600">
-                          لقد قمت بإرسال هذا النموذج بالفعل
+                          تم استقبال طلبك مسبقاً، انتظر النتيجة خلال الساعات
+                          القادمة
                         </p>
                       </div>
                     </div>
@@ -758,6 +762,30 @@ export default function Home() {
           </motion.p>
         </div>
       </div>
+
+      {/* Modals */}
+      <EmailVerificationModal
+        isOpen={showVerificationModal}
+        onVerified={() => setShowVerificationModal(false)}
+      />
+      <WelcomeModal
+        isOpen={showWelcomeModal}
+        onAccept={() => {
+          setHasAcceptedTerms(true);
+          setShowWelcomeModal(false);
+        }}
+        welcomeMessage={stageSettings?.welcome_message || ""}
+        userAgreement={stageSettings?.user_agreement || ""}
+      />
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        message={stageSettings?.success_message || ""}
+      />
+      <WhatsAppTestModal
+        isOpen={showWhatsAppModal}
+        onClose={() => setShowWhatsAppModal(false)}
+      />
     </div>
   );
 }

@@ -22,6 +22,24 @@ import {
 import * as XLSX from "xlsx";
 import { CustomFilterDropdown } from "@/components/custom-filter-dropdown";
 
+// Safely parse JSON strings (returns null on failure)
+function safeParseJSON(str: string | null | undefined): any {
+  if (!str || typeof str !== "string") return null;
+  try {
+    return JSON.parse(str);
+  } catch {
+    return null;
+  }
+}
+
+// Normalize options shape to an array of { label, value }
+function getOptionsArray(opts: any): Array<{ label: string; value: any }> {
+  if (!opts) return [];
+  if (Array.isArray(opts)) return opts as any[];
+  if (Array.isArray(opts?.options)) return opts.options as any[];
+  return [];
+}
+
 type Submission = {
   id: string;
   user_email: string;
@@ -30,8 +48,8 @@ type Submission = {
   created_at: string;
   updated_at: string;
   score?: number;
-  approved?: boolean;
   ai_evaluations?: any;
+  filtering_decision?: "auto" | "exclude" | "nominated";
 };
 
 type FormField = {
@@ -52,8 +70,8 @@ export default function SubmissionsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<number | "all">("all");
-  const [approvalFilter, setApprovalFilter] = useState<
-    "all" | "approved" | "unapproved"
+  const [filteringDecisionFilter, setFilteringDecisionFilter] = useState<
+    "all" | "auto" | "exclude" | "nominated"
   >("all");
   const [advancedFilters, setAdvancedFilters] = useState<Record<string, any>>(
     {}
@@ -63,9 +81,9 @@ export default function SubmissionsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [sortField, setSortField] = useState<
     "score" | "age" | "created_at" | "stage" | null
-  >(null);
+  >("score"); // Default to score
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [rowsPerPage, setRowsPerPage] = useState<number>(50);
+  const [rowsPerPage, setRowsPerPage] = useState<number>(1000); // Default to 1000
   const supabase = createClient();
 
   useEffect(() => {
@@ -83,7 +101,12 @@ export default function SubmissionsPage() {
         .order("display_order");
 
       if (error) throw error;
-      setFormFields(data || []);
+      const parsed = (data || []).map((f: any) => ({
+        ...f,
+        options:
+          typeof f.options === "string" ? safeParseJSON(f.options) : f.options,
+      }));
+      setFormFields(parsed);
     } catch (error) {
       console.error("Error fetching form fields:", error);
     }
@@ -113,10 +136,9 @@ export default function SubmissionsPage() {
 
     const matchesStage = stageFilter === "all" || sub.stage === stageFilter;
 
-    const matchesApproval =
-      approvalFilter === "all" ||
-      (approvalFilter === "approved" && sub.approved) ||
-      (approvalFilter === "unapproved" && !sub.approved);
+    const matchesFilteringDecision =
+      filteringDecisionFilter === "all" ||
+      (sub.filtering_decision || "auto") === filteringDecisionFilter;
 
     const matchesAdvancedFilters = Object.entries(advancedFilters).every(
       ([fieldName, filterValue]) => {
@@ -126,7 +148,10 @@ export default function SubmissionsPage() {
     );
 
     return (
-      matchesSearch && matchesStage && matchesApproval && matchesAdvancedFilters
+      matchesSearch &&
+      matchesStage &&
+      matchesFilteringDecision &&
+      matchesAdvancedFilters
     );
   });
 
@@ -186,42 +211,77 @@ export default function SubmissionsPage() {
     }
   };
 
-  const toggleApproval = async (id: string, currentStatus: boolean) => {
-    try {
-      const { error } = await supabase
-        .from("form_submissions")
-        .update({ approved: !currentStatus })
-        .eq("id", id);
-
-      if (error) throw error;
-      setSubmissions((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, approved: !currentStatus } : s))
-      );
-    } catch (error) {
-      console.error("Error toggling approval:", error);
-      alert("حدث خطأ أثناء تحديث الحالة");
-    }
-  };
-
-  const bulkApprove = async (approve: boolean) => {
+  const bulkUpdateFilteringDecision = async (
+    decision: "auto" | "exclude" | "nominated"
+  ) => {
     if (selectedIds.length === 0) return;
 
     try {
       const { error } = await supabase
         .from("form_submissions")
-        .update({ approved: approve })
+        .update({ filtering_decision: decision })
         .in("id", selectedIds);
 
       if (error) throw error;
       setSubmissions((prev) =>
         prev.map((s) =>
-          selectedIds.includes(s.id) ? { ...s, approved: approve } : s
+          selectedIds.includes(s.id)
+            ? { ...s, filtering_decision: decision }
+            : s
         )
       );
       setSelectedIds([]);
     } catch (error) {
       console.error("Error bulk updating:", error);
       alert("حدث خطأ أثناء التحديث الجماعي");
+    }
+  };
+
+  const updateFilteringDecision = async (
+    id: string,
+    decision: "auto" | "exclude" | "nominated"
+  ) => {
+    try {
+      const { error } = await supabase
+        .from("form_submissions")
+        .update({ filtering_decision: decision })
+        .eq("id", id);
+
+      if (error) throw error;
+      setSubmissions((prev) =>
+        prev.map((s) =>
+          s.id === id ? { ...s, filtering_decision: decision } : s
+        )
+      );
+    } catch (error) {
+      console.error("Error updating filtering decision:", error);
+      alert("حدث خطأ أثناء تحديث قرار التصفية");
+    }
+  };
+
+  const getFilteringDecisionLabel = (decision?: string) => {
+    switch (decision) {
+      case "auto":
+        return "آلي";
+      case "exclude":
+        return "استبعاد";
+      case "nominated":
+        return "مرشح";
+      default:
+        return "آلي";
+    }
+  };
+
+  const getFilteringDecisionColor = (decision?: string) => {
+    switch (decision) {
+      case "auto":
+        return "bg-gray-100 text-gray-700";
+      case "exclude":
+        return "bg-red-100 text-red-700";
+      case "nominated":
+        return "bg-green-100 text-green-700";
+      default:
+        return "bg-gray-100 text-gray-700";
     }
   };
 
@@ -255,37 +315,110 @@ export default function SubmissionsPage() {
   const clearAllFilters = () => {
     setSearchQuery("");
     setStageFilter("all");
-    setApprovalFilter("all");
+    setFilteringDecisionFilter("all");
     setAdvancedFilters({});
-    setSortField(null);
+    setSortField("score");
     setSortDirection("desc");
   };
 
   const hasActiveFilters =
     searchQuery !== "" ||
     stageFilter !== "all" ||
-    approvalFilter !== "all" ||
+    filteringDecisionFilter !== "all" ||
     Object.keys(advancedFilters).some(
       (key) => advancedFilters[key] !== "all" && advancedFilters[key] !== ""
     );
 
-  const approvedCount = submissions.filter((s) => s.approved).length;
-  const unapprovedCount = submissions.length - approvedCount;
+  const autoCount = submissions.filter(
+    (s) => (s.filtering_decision || "auto") === "auto"
+  ).length;
+  const excludeCount = submissions.filter(
+    (s) => s.filtering_decision === "exclude"
+  ).length;
+  const nominatedCount = submissions.filter(
+    (s) => s.filtering_decision === "nominated"
+  ).length;
 
   const exportToExcel = () => {
-    const exportData = sortedSubmissions.map((sub) => ({
-      "User Email": sub.user_email,
-      Stage: sub.stage,
-      Score: sub.score || 0,
-      Approved: sub.approved ? "Yes" : "No",
-      "Created At": new Date(sub.created_at).toLocaleString("en-US"),
-      ...sub.data,
-    }));
+    const exportData = sortedSubmissions.map((sub) => {
+      const row: Record<string, any> = {
+        "البريد الإلكتروني": sub.user_email,
+        المرحلة: `المرحلة ${sub.stage}`,
+        الدرجة: sub.score || 0,
+        "قرار التصفية": getFilteringDecisionLabel(sub.filtering_decision),
+        "تاريخ التقديم": new Date(sub.created_at).toLocaleString("ar-SA", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      };
+
+      // Parse data if it's a string
+      const submissionData =
+        typeof sub.data === "string" ? JSON.parse(sub.data) : sub.data;
+
+      // Add form fields with Arabic labels
+      Object.keys(submissionData || {}).forEach((fieldName) => {
+        const fieldValue = submissionData[fieldName];
+        const field = formFields.find((f) => f.field_name === fieldName);
+        const arabicLabel = field?.label || fieldName;
+
+        // Handle different field types
+        if (
+          field &&
+          (field.field_type === "dropdown" ||
+            field.field_type === "select" ||
+            field.field_type === "radio")
+        ) {
+          // Find the option label in Arabic
+          const optionsList = getOptionsArray(field.options);
+          const option = optionsList.find(
+            (opt: any) => String(opt.value) === String(fieldValue)
+          );
+          row[arabicLabel] = option?.label || fieldValue || "";
+        } else if (field && field.field_type === "checkbox") {
+          // Handle checkbox values
+          if (Array.isArray(fieldValue)) {
+            const optionsList = getOptionsArray(field.options);
+            const selectedOptions = fieldValue.map((val: string) => {
+              const option = optionsList.find(
+                (opt: any) => String(opt.value) === String(val)
+              );
+              return option?.label || val;
+            });
+            row[arabicLabel] = selectedOptions.join("، ");
+          } else {
+            row[arabicLabel] =
+              fieldValue === true
+                ? "نعم"
+                : fieldValue === false
+                ? "لا"
+                : fieldValue || "";
+          }
+        } else {
+          row[arabicLabel] = fieldValue || "";
+        }
+      });
+
+      return row;
+    });
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Submissions");
-    XLSX.writeFile(wb, `submissions-${new Date().toISOString()}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "الطلبات");
+
+    // Auto-size columns
+    const colWidths = Object.keys(exportData[0] || {}).map((key) => ({
+      wch: Math.max(key.length, 15),
+    }));
+    ws["!cols"] = colWidths;
+
+    XLSX.writeFile(
+      wb,
+      `submissions-${new Date().toISOString().split("T")[0]}.xlsx`
+    );
   };
 
   const getFieldLabel = (fieldName: string) => {
@@ -384,16 +517,22 @@ export default function SubmissionsPage() {
 
           {/* Statistics */}
           <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2 px-4 py-2 bg-green-50 border-2 border-green-200 rounded-xl">
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
-              <span className="text-sm font-semibold text-green-700">
-                موافق عليها: {approvedCount}
+            <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border-2 border-gray-200 rounded-xl">
+              <div className="w-3 h-3 rounded-full bg-gray-400"></div>
+              <span className="text-sm font-semibold text-gray-700">
+                آلي: {autoCount}
               </span>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border-2 border-gray-200 rounded-xl">
-              <XCircle className="w-5 h-5 text-gray-600" />
-              <span className="text-sm font-semibold text-gray-700">
-                غير موافق عليها: {unapprovedCount}
+            <div className="flex items-center gap-2 px-4 py-2 bg-red-50 border-2 border-red-200 rounded-xl">
+              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+              <span className="text-sm font-semibold text-red-700">
+                استبعاد: {excludeCount}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 bg-green-50 border-2 border-green-200 rounded-xl">
+              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+              <span className="text-sm font-semibold text-green-700">
+                مرشح: {nominatedCount}
               </span>
             </div>
 
@@ -462,20 +601,28 @@ export default function SubmissionsPage() {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => bulkApprove(true)}
+                  onClick={() => bulkUpdateFilteringDecision("nominated")}
                   className="px-4 py-2 bg-green-500 text-white rounded-lg font-semibold text-sm hover:bg-green-600 transition-colors flex items-center gap-2"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  موافقة جماعية
+                  مرشح
                 </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => bulkApprove(false)}
-                  className="px-4 py-2 bg-gray-500 text-white rounded-lg font-semibold text-sm hover:bg-gray-600 transition-colors flex items-center gap-2"
+                  onClick={() => bulkUpdateFilteringDecision("exclude")}
+                  className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold text-sm hover:bg-red-600 transition-colors flex items-center gap-2"
                 >
                   <XCircle className="w-4 h-4" />
-                  إلغاء الموافقة
+                  استبعاد
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => bulkUpdateFilteringDecision("auto")}
+                  className="px-4 py-2 bg-gray-500 text-white rounded-lg font-semibold text-sm hover:bg-gray-600 transition-colors"
+                >
+                  آلي
                 </motion.button>
               </div>
             </motion.div>
@@ -528,21 +675,21 @@ export default function SubmissionsPage() {
               />
             </div>
 
-            {/* Approval Filter */}
+            {/* Filtering Decision Filter */}
             <div className="w-full sm:w-48">
               <CustomFilterDropdown
-                label="الحالة"
-                value={approvalFilter}
+                label="قرار التصفية"
+                value={filteringDecisionFilter}
                 options={[
                   { value: "all", label: `الكل (${submissions.length})` },
-                  { value: "approved", label: `موافق (${approvedCount})` },
-                  {
-                    value: "unapproved",
-                    label: `غير موافق (${unapprovedCount})`,
-                  },
+                  { value: "auto", label: `آلي (${autoCount})` },
+                  { value: "exclude", label: `استبعاد (${excludeCount})` },
+                  { value: "nominated", label: `مرشح (${nominatedCount})` },
                 ]}
                 onChange={(value) =>
-                  setApprovalFilter(value as "all" | "approved" | "unapproved")
+                  setFilteringDecisionFilter(
+                    value as "all" | "auto" | "exclude" | "nominated"
+                  )
                 }
               />
             </div>
@@ -586,7 +733,7 @@ export default function SubmissionsPage() {
           </p>
         </motion.div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+        <div className="bg-white rounded-2xl max-w-[1200px] shadow-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] text-white">
@@ -651,7 +798,7 @@ export default function SubmissionsPage() {
                     </div>
                   </th>
                   <th className="px-6 py-4 text-center text-sm font-bold">
-                    الحالة
+                    قرار التصفية
                   </th>
                   <th className="px-6 py-4 text-center text-sm font-bold">
                     إجراءات
@@ -730,33 +877,47 @@ export default function SubmissionsPage() {
                       })}
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() =>
-                          toggleApproval(
-                            submission.id,
-                            submission.approved || false
-                          )
-                        }
-                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold transition-colors ${
-                          submission.approved
-                            ? "bg-green-100 text-green-700 hover:bg-green-200"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                        }`}
-                      >
-                        {submission.approved ? (
-                          <>
-                            <CheckCircle2 className="w-3 h-3 ml-1" />
-                            موافق
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="w-3 h-3 ml-1" />
-                            غير موافق
-                          </>
-                        )}
-                      </motion.button>
+                      <div className="relative group inline-block">
+                        <button
+                          className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold cursor-pointer transition-all hover:shadow-md ${getFilteringDecisionColor(
+                            submission.filtering_decision
+                          )}`}
+                        >
+                          {getFilteringDecisionLabel(
+                            submission.filtering_decision
+                          )}
+                          <ChevronDown className="w-3 h-3" />
+                        </button>
+                        <div className="absolute left-0 mt-1 w-32 bg-white rounded-lg shadow-xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                          <button
+                            onClick={() =>
+                              updateFilteringDecision(submission.id, "auto")
+                            }
+                            className="w-full text-right px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 first:rounded-t-lg transition-colors"
+                          >
+                            آلي
+                          </button>
+                          <button
+                            onClick={() =>
+                              updateFilteringDecision(submission.id, "exclude")
+                            }
+                            className="w-full text-right px-4 py-2 text-xs font-medium text-red-700 hover:bg-red-50 transition-colors"
+                          >
+                            استبعاد
+                          </button>
+                          <button
+                            onClick={() =>
+                              updateFilteringDecision(
+                                submission.id,
+                                "nominated"
+                              )
+                            }
+                            className="w-full text-right px-4 py-2 text-xs font-medium text-green-700 hover:bg-green-50 last:rounded-b-lg transition-colors"
+                          >
+                            مرشح
+                          </button>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center gap-2">
@@ -976,7 +1137,7 @@ export default function SubmissionsPage() {
                             <span className="inline-flex items-center px-5 py-2 rounded-full text-xl font-bold bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg">
                               {selectedSubmission.score?.toFixed(1) || "0.0"} /{" "}
                               {formFields.filter((f) => f.has_weight).length *
-                                100}
+                                1000}
                             </span>
                           </div>
                         </div>

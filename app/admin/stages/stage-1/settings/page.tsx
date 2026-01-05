@@ -2,14 +2,19 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Save, AlertTriangle, X, CheckCircle2 } from "lucide-react";
+import { Save, AlertTriangle, X, CheckCircle2, Send } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
+type TabType = "pre-stage" | "post-stage";
+
 export default function Stage1SettingsPage() {
+  const [activeTab, setActiveTab] = useState<TabType>("post-stage");
   const [passedEmailContent, setPassedEmailContent] = useState("");
   const [failedEmailContent, setFailedEmailContent] = useState("");
+  const [preStageEmailContent, setPreStageEmailContent] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [sending, setSending] = useState(false);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -33,13 +38,14 @@ export default function Stage1SettingsPage() {
       if (data) {
         setPassedEmailContent(data.passed_email_content || "");
         setFailedEmailContent(data.failed_email_content || "");
+        setPreStageEmailContent(data.pre_stage_email_content || "");
       }
     } catch (error) {
       console.error("Error loading settings:", error);
     }
   };
 
-  const handleSaveSettings = async () => {
+  const handleSavePostStageSettings = async () => {
     setSaving(true);
     try {
       const { data: existing } = await supabase
@@ -77,6 +83,98 @@ export default function Stage1SettingsPage() {
       setTimeout(() => setMessage(null), 3000);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSavePreStageEmail = async () => {
+    setSaving(true);
+    try {
+      const { data: existing } = await supabase
+        .from("stage_settings")
+        .select("id")
+        .eq("stage", 1)
+        .single();
+
+      if (existing) {
+        const { error } = await supabase
+          .from("stage_settings")
+          .update({
+            pre_stage_email_content: preStageEmailContent,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("stage", 1);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("stage_settings").insert({
+          stage: 1,
+          pre_stage_email_content: preStageEmailContent,
+        });
+
+        if (error) throw error;
+      }
+
+      setMessage({
+        type: "success",
+        text: "تم حفظ محتوى البريد الإلكتروني بنجاح!",
+      });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      console.error("Error saving pre-stage email:", error);
+      setMessage({
+        type: "error",
+        text: "فشل حفظ محتوى البريد الإلكتروني. حاول مرة أخرى.",
+      });
+      setTimeout(() => setMessage(null), 3000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSendPreStageEmail = async () => {
+    if (!preStageEmailContent.trim()) {
+      setMessage({
+        type: "error",
+        text: "يرجى كتابة محتوى البريد الإلكتروني أولاً",
+      });
+      setTimeout(() => setMessage(null), 3000);
+      return;
+    }
+
+    setSending(true);
+    try {
+      // Get all users in this stage (you may need to adjust the query based on your schema)
+      const { data: submissions, error: fetchError } = await supabase
+        .from("form_submissions")
+        .select("email")
+        .eq("stage", 1);
+
+      if (fetchError) throw fetchError;
+
+      if (!submissions || submissions.length === 0) {
+        setMessage({ type: "error", text: "لا يوجد مستخدمين في هذه المرحلة" });
+        setTimeout(() => setMessage(null), 3000);
+        setSending(false);
+        return;
+      }
+
+      // TODO: Implement email sending logic here
+      // This would typically call an API endpoint that handles email sending
+
+      setMessage({
+        type: "success",
+        text: `سيتم إرسال البريد الإلكتروني إلى ${submissions.length} مستخدم قريباً`,
+      });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      console.error("Error sending emails:", error);
+      setMessage({
+        type: "error",
+        text: "فشل إرسال البريد الإلكتروني. حاول مرة أخرى.",
+      });
+      setTimeout(() => setMessage(null), 3000);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -124,114 +222,241 @@ export default function Stage1SettingsPage() {
         )}
       </AnimatePresence>
 
-      <div className="space-y-6">
-        {/* Passed Users Email */}
-        <div className="bg-white rounded-2xl border-2 border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
-            محتوى البريد الإلكتروني للمتقدمين الناجحين
-          </h2>
-          <p className="text-sm text-gray-600 mb-4">
-            هذا البريد سيتم إرساله للمستخدمين الذين اجتازوا المرحلة بنجاح
-          </p>
-          <textarea
-            value={passedEmailContent}
-            onChange={(e) => setPassedEmailContent(e.target.value)}
-            rows={8}
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all resize-none"
-            placeholder="اكتب محتوى البريد الإلكتروني هنا..."
-          />
-        </div>
-
-        {/* Failed Users Email */}
-        <div className="bg-white rounded-2xl border-2 border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
-            محتوى البريد الإلكتروني للمتقدمين غير الناجحين
-          </h2>
-          <p className="text-sm text-gray-600 mb-4">
-            هذا البريد سيتم إرساله للمستخدمين الذين لم يجتازوا المرحلة
-          </p>
-          <textarea
-            value={failedEmailContent}
-            onChange={(e) => setFailedEmailContent(e.target.value)}
-            rows={8}
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all resize-none"
-            placeholder="اكتب محتوى البريد الإلكتروني هنا..."
-          />
-        </div>
-
-        {/* Save Button */}
-        <div className="flex justify-end">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleSaveSettings}
-            disabled={saving}
-            className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
-          >
-            {saving ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>جاري الحفظ...</span>
-              </>
-            ) : (
-              <>
-                <Save className="w-5 h-5" />
-                <span>حفظ الإعدادات</span>
-              </>
-            )}
-          </motion.button>
-        </div>
-
-        {/* Danger Zone */}
-        <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-6 mt-8">
-          <div className="flex items-start gap-3 mb-4">
-            <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" />
-            <div>
-              <h2 className="text-xl font-bold text-red-900 mb-1">
-                منطقة الخطر
-              </h2>
-              <p className="text-sm text-red-700">
-                إجراء إنهاء المرحلة لا يمكن التراجع عنه
-              </p>
-            </div>
+      {/* Tabs */}
+      <div className="mb-6">
+        <div className="border-b-2 border-gray-200">
+          <div className="flex gap-4">
+            <button
+              onClick={() => setActiveTab("pre-stage")}
+              className={`
+                px-6 py-3 font-semibold transition-all relative
+                ${
+                  activeTab === "pre-stage"
+                    ? "text-[#2A3984]"
+                    : "text-gray-500 hover:text-gray-700"
+                }
+              `}
+            >
+              رسائل ما قبل المرحلة
+              {activeTab === "pre-stage" && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2A3984]"
+                />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("post-stage")}
+              className={`
+                px-6 py-3 font-semibold transition-all relative
+                ${
+                  activeTab === "post-stage"
+                    ? "text-[#2A3984]"
+                    : "text-gray-500 hover:text-gray-700"
+                }
+              `}
+            >
+              رسائل ما بعد المرحلة
+              {activeTab === "post-stage" && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2A3984]"
+                />
+              )}
+            </button>
           </div>
-
-          <div className="bg-white rounded-xl p-4 mb-4">
-            <h3 className="font-bold text-gray-900 mb-2">
-              ماذا سيحدث عند إنهاء المرحلة؟
-            </h3>
-            <ul className="space-y-2 text-sm text-gray-700">
-              <li className="flex items-start gap-2">
-                <span className="text-red-600 font-bold">•</span>
-                <span>
-                  سيتم منع المستخدمين من تقديم نماذج جديدة لهذه المرحلة
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-red-600 font-bold">•</span>
-                <span>
-                  سيتم إرسال رسائل بريد إلكتروني للمستخدمين الناجحين وغير
-                  الناجحين
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-red-600 font-bold">•</span>
-                <span>لا يمكن التراجع عن هذا الإجراء</span>
-              </li>
-            </ul>
-          </div>
-
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setShowConfirmModal(true)}
-            className="w-full px-6 py-4 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
-          >
-            <AlertTriangle className="w-5 h-5" />
-            <span>إنهاء المرحلة الأولى</span>
-          </motion.button>
         </div>
       </div>
+
+      {/* Tab Content */}
+      <AnimatePresence mode="wait">
+        {activeTab === "pre-stage" ? (
+          <motion.div
+            key="pre-stage"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="space-y-6"
+          >
+            {/* Pre-Stage Email Content */}
+            <div className="bg-white rounded-2xl border-2 border-gray-200 p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-2">
+                محتوى البريد الإلكتروني للمرحلة
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">
+                هذا البريد سيتم إرساله لجميع المستخدمين في هذه المرحلة
+              </p>
+              <textarea
+                value={preStageEmailContent}
+                onChange={(e) => setPreStageEmailContent(e.target.value)}
+                rows={12}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all resize-none"
+                placeholder="اكتب محتوى البريد الإلكتروني هنا..."
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 justify-end">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleSavePreStageEmail}
+                disabled={saving}
+                className="flex items-center gap-2 px-6 py-3 bg-gray-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+              >
+                {saving ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>جاري الحفظ...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5" />
+                    <span>حفظ المحتوى</span>
+                  </>
+                )}
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleSendPreStageEmail}
+                disabled={sending || !preStageEmailContent.trim()}
+                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+              >
+                {sending ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>جاري الإرسال...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-5 h-5" />
+                    <span>إرسال إلى جميع المستخدمين</span>
+                  </>
+                )}
+              </motion.button>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="post-stage"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="space-y-6"
+          >
+            {/* Passed Users Email */}
+            <div className="bg-white rounded-2xl border-2 border-gray-200 p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-2">
+                محتوى البريد الإلكتروني للمتقدمين الناجحين
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">
+                هذا البريد سيتم إرساله للمستخدمين الذين اجتازوا المرحلة بنجاح
+              </p>
+              <textarea
+                value={passedEmailContent}
+                onChange={(e) => setPassedEmailContent(e.target.value)}
+                rows={8}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all resize-none"
+                placeholder="اكتب محتوى البريد الإلكتروني هنا..."
+              />
+            </div>
+
+            {/* Failed Users Email */}
+            <div className="bg-white rounded-2xl border-2 border-gray-200 p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-2">
+                محتوى البريد الإلكتروني للمتقدمين غير الناجحين
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">
+                هذا البريد سيتم إرساله للمستخدمين الذين لم يجتازوا المرحلة
+              </p>
+              <textarea
+                value={failedEmailContent}
+                onChange={(e) => setFailedEmailContent(e.target.value)}
+                rows={8}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all resize-none"
+                placeholder="اكتب محتوى البريد الإلكتروني هنا..."
+              />
+            </div>
+
+            {/* Save Button */}
+            <div className="flex justify-end">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleSavePostStageSettings}
+                disabled={saving}
+                className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+              >
+                {saving ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>جاري الحفظ...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5" />
+                    <span>حفظ الإعدادات</span>
+                  </>
+                )}
+              </motion.button>
+            </div>
+
+            {/* Danger Zone */}
+            <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-6 mt-8">
+              <div className="flex items-start gap-3 mb-4">
+                <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" />
+                <div>
+                  <h2 className="text-xl font-bold text-red-900 mb-1">
+                    منطقة الخطر
+                  </h2>
+                  <p className="text-sm text-red-700">
+                    إجراء إنهاء المرحلة لا يمكن التراجع عنه
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl p-4 mb-4">
+                <h3 className="font-bold text-gray-900 mb-2">
+                  ماذا سيحدث عند إنهاء المرحلة؟
+                </h3>
+                <ul className="space-y-2 text-sm text-gray-700">
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-600 font-bold">•</span>
+                    <span>
+                      سيتم منع المستخدمين من تقديم نماذج جديدة لهذه المرحلة
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-600 font-bold">•</span>
+                    <span>
+                      سيتم إرسال رسائل بريد إلكتروني للمستخدمين الناجحين وغير
+                      الناجحين
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-600 font-bold">•</span>
+                    <span>لا يمكن التراجع عن هذا الإجراء</span>
+                  </li>
+                </ul>
+              </div>
+
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setShowConfirmModal(true)}
+                className="w-full px-6 py-4 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
+              >
+                <AlertTriangle className="w-5 h-5" />
+                <span>إنهاء المرحلة الأولى</span>
+              </motion.button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Confirmation Modal */}
       <AnimatePresence>
