@@ -13,6 +13,7 @@ export function WhatsAppTestModal({ isOpen, onClose }: WhatsAppTestModalProps) {
   const [template, setTemplate] = useState("");
   const [param1, setParam1] = useState("");
   const [param2, setParam2] = useState("");
+  const [buttonText, setButtonText] = useState("");
   const [urlButton, setUrlButton] = useState("");
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{
@@ -44,6 +45,7 @@ export function WhatsAppTestModal({ isOpen, onClose }: WhatsAppTestModalProps) {
           template: template,
           param_1: param1 || undefined,
           param_2: param2 || undefined,
+          button_text: buttonText || undefined,
           url_button: urlButton || undefined,
         }),
       });
@@ -55,6 +57,7 @@ export function WhatsAppTestModal({ isOpen, onClose }: WhatsAppTestModalProps) {
         setPhoneNumber("");
         setTemplate("");
         setParam1("");
+        setButtonText("");
         setParam2("");
         setUrlButton("");
       } else {
@@ -75,6 +78,7 @@ export function WhatsAppTestModal({ isOpen, onClose }: WhatsAppTestModalProps) {
     setPhoneNumber("");
     setTemplate("");
     setParam1("");
+    setButtonText("");
     setParam2("");
     setUrlButton("");
     setResult(null);
@@ -161,35 +165,65 @@ export function WhatsAppTestModal({ isOpen, onClose }: WhatsAppTestModalProps) {
                 disabled={sending}
               />
               <p className="text-xs text-gray-500 mt-1">
-                أدخل اسم القالب المعتمد في WhatsApp Business
+                اسم القالب المعتمد في WhatsApp Business API
+              </p>
+            </div>
+
+            {/* Info Box */}
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-xs text-blue-700">
+                <strong>ملاحظة:</strong> إذا كان القالب يحتوي على متغيرات (مثل{" "}
+                {"{{1}}"}، {"{{2}}"})، يجب إدخال قيم المعاملات المطلوبة. تحقق من
+                إعدادات القالب في WhatsApp Business API.
               </p>
             </div>
 
             {/* Parameter 1 Input */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                معامل 1 (اختياري)
+                معامل 1 (يحل محل {"{{1}}"} في القالب)
               </label>
               <input
                 type="text"
                 value={param1}
                 onChange={(e) => setParam1(e.target.value)}
-                placeholder="param_1"
+                placeholder="مثال: ماهر"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8E1538] focus:border-transparent outline-none transition-all"
                 disabled={sending}
               />
+              <p className="text-xs text-gray-500 mt-1">
+                أدخل القيمة مباشرة (بدون أقواس)
+              </p>
             </div>
 
             {/* Parameter 2 Input */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                معامل 2 (اختياري)
+                معامل 2 (يحل محل {"{{2}}"} في القالب - اختياري)
               </label>
               <input
                 type="text"
                 value={param2}
                 onChange={(e) => setParam2(e.target.value)}
-                placeholder="param_2"
+                placeholder="مثال: أحمد"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8E1538] focus:border-transparent outline-none transition-all"
+                disabled={sending}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                أدخل القيمة مباشرة (بدون أقواس)
+              </p>
+            </div>
+
+            {/* Button Text Input */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                نص الزر (اختياري)
+              </label>
+              <input
+                type="text"
+                value={buttonText}
+                onChange={(e) => setButtonText(e.target.value)}
+                placeholder="مثال: انقر هنا"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8E1538] focus:border-transparent outline-none transition-all"
                 disabled={sending}
               />
@@ -219,11 +253,21 @@ export function WhatsAppTestModal({ isOpen, onClose }: WhatsAppTestModalProps) {
                     : "bg-red-50 text-red-700 border border-red-200"
                 }`}
               >
-                <div>{result.message}</div>
+                <div className="font-semibold mb-1">{result.message}</div>
+                {result.details?.error?.error_data?.details && (
+                  <div className="text-sm mt-1 mb-2">
+                    {result.details.error.error_data.details}
+                  </div>
+                )}
                 {result.details && (
-                  <pre className="text-xs mt-2 overflow-auto max-h-32">
-                    {JSON.stringify(result.details, null, 2)}
-                  </pre>
+                  <details className="text-xs mt-2">
+                    <summary className="cursor-pointer hover:underline">
+                      تفاصيل الخطأ
+                    </summary>
+                    <pre className="mt-2 overflow-auto max-h-32 bg-white/50 p-2 rounded">
+                      {JSON.stringify(result.details, null, 2)}
+                    </pre>
+                  </details>
                 )}
               </div>
             )}

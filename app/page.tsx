@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
 import { EmailVerificationModal } from "@/components/email-verification-modal";
 import { WelcomeModal } from "@/components/welcome-modal";
-import { SuccessModal } from "@/components/success-modal";
 import { WhatsAppTestModal } from "@/components/whatsapp-test-modal";
 import { DynamicFormField } from "@/components/dynamic-form-field";
 import { createClient } from "@/lib/supabase/client";
@@ -44,7 +43,7 @@ export default function Home() {
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
   const [isFormLocked, setIsFormLocked] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
-  const [checkingSubmission, setCheckingSubmission] = useState(false);
+  const [checkingSubmission, setCheckingSubmission] = useState(true);
   const { user, loading } = useAuth();
   const [formFields, setFormFields] = useState<FormFieldData[]>([]);
   const [formValues, setFormValues] = useState<Record<string, any>>({});
@@ -83,8 +82,12 @@ export default function Home() {
       setCheckingSubmission(false);
     };
 
-    if (user && !loading) {
-      checkSubmission();
+    if (!loading) {
+      if (user) {
+        checkSubmission();
+      } else {
+        setCheckingSubmission(false);
+      }
     }
   }, [user, loading, currentStep]);
 
@@ -170,11 +173,20 @@ export default function Home() {
           field: condField,
           operator,
           values,
+          value: condRequiredValue,
         } = field.validation_rules.conditional;
         const condValue = formValues[condField];
 
-        if (operator === "in" && !values.includes(condValue)) {
-          return; // Skip validation if field is not shown
+        // Skip validation if field is not shown
+        let shouldShow = true;
+        if (operator === "in") {
+          shouldShow = values.includes(condValue);
+        } else if (operator === "equals") {
+          shouldShow = condValue === condRequiredValue;
+        }
+
+        if (!shouldShow) {
+          return; // Skip validation entirely if field is hidden
         }
       }
 
@@ -329,12 +341,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {/* Email Verification Modal */}
-      <EmailVerificationModal
-        isOpen={showVerificationModal}
-        onVerified={handleVerified}
-      />
-
       {/* Welcome Modal */}
       {stageSettings && (
         <WelcomeModal
@@ -342,15 +348,6 @@ export default function Home() {
           onAccept={handleAcceptTerms}
           welcomeMessage={stageSettings.welcome_message || ""}
           userAgreement={stageSettings.user_agreement || ""}
-        />
-      )}
-
-      {/* Success Modal */}
-      {stageSettings && (
-        <SuccessModal
-          isOpen={showSuccessModal}
-          onClose={() => setShowSuccessModal(false)}
-          message={stageSettings.success_message || ""}
         />
       )}
 
@@ -413,12 +410,83 @@ export default function Home() {
           </motion.div>
 
           {/* Main Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden"
-          >
+          <AnimatePresence mode="wait">
+            {showSuccessModal && stageSettings ? (
+              // Success Section
+              <motion.div
+                key="success"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.5 }}
+                className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden"
+              >
+                <div className="px-8 py-16 sm:py-20">
+                  {/* Success Icon */}
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                    className="flex justify-center mb-8"
+                  >
+                    <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center shadow-2xl">
+                      <svg
+                        className="w-14 h-14 sm:w-20 sm:h-20 text-white"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2.5}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    </div>
+                  </motion.div>
+
+                  {/* Title */}
+                  <motion.h2
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="text-3xl sm:text-4xl font-bold text-center text-gray-800 mb-6"
+                  >
+                    تم الإرسال بنجاح!
+                  </motion.h2>
+
+                  {/* Message */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className="text-center text-gray-600 text-lg leading-relaxed mb-10 whitespace-pre-line max-w-2xl mx-auto"
+                  >
+                    {stageSettings.success_message || "شكراً لك! تم استلام طلبك وسيتم مراجعته قريباً."}
+                  </motion.div>
+
+                  {/* Decorative Element */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                    className="flex justify-center"
+                  >
+                    <div className="w-16 h-1 bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] rounded-full"></div>
+                  </motion.div>
+                </div>
+              </motion.div>
+            ) : (
+              // Form Section
+              <motion.div
+                key="form"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -30 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden"
+              >
             {/* Header with Gradient */}
             <div className="relative bg-gradient-to-br from-[#2A3984] via-[#2A3984] to-[#1e2a5c] px-8 py-8 sm:py-10">
               <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLW9wYWNpdHk9IjAuMDUiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-40"></div>
@@ -514,7 +582,7 @@ export default function Home() {
                       </motion.div>
                       <span
                         className={`
-                          text-xs sm:text-sm font-medium text-center max-w-[100px]
+                          text-xs sm:text-sm font-medium text-center mt-3 max-w-[200px]
                           ${
                             isCompleted || isCurrent
                               ? "text-[#2A3984]"
@@ -737,6 +805,8 @@ export default function Home() {
               )}
             </div>
           </motion.div>
+          )}
+          </AnimatePresence>
 
           {/* Footer */}
           <motion.p
@@ -776,11 +846,6 @@ export default function Home() {
         }}
         welcomeMessage={stageSettings?.welcome_message || ""}
         userAgreement={stageSettings?.user_agreement || ""}
-      />
-      <SuccessModal
-        isOpen={showSuccessModal}
-        onClose={() => setShowSuccessModal(false)}
-        message={stageSettings?.success_message || ""}
       />
       <WhatsAppTestModal
         isOpen={showWhatsAppModal}

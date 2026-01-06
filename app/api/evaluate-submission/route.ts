@@ -28,11 +28,60 @@ interface EvaluationRequest {
 async function evaluateWithRetry(
   prompt: string,
   userAnswer: string,
+  rubric: AIPromptData["rubric"],
   retries = 3,
   delay = 1000
 ): Promise<any> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
+      // Check if we have a rubric with multiple criteria
+      const hasRubric = rubric && rubric.rows && rubric.rows.length > 0;
+
+      let systemContent = "";
+      let userContent = "";
+
+      if (hasRubric) {
+        // Extract criteria and weights from rubric
+        const criteria = rubric.rows.map((row) => {
+          const criterionName = row.cells[0]?.value || "";
+          const scale = row.cells[1]?.value || "0-100";
+          const weight = row.cells[3]?.value || "0%";
+          return { name: criterionName, scale, weight };
+        });
+
+        systemContent = `أنت خبير تقييم. قيّم إجابة المتقدم وفق المعايير المحددة. 
+
+يجب أن يكون ردك بصيغة JSON صحيحة تحتوي على كائن لكل معيار تقييم.
+
+البنية المطلوبة:
+{
+  "المعيار الأول": {
+    "score": رقم من 0-100,
+    "explanation": "تفسير قصير بالعربية (أقل من 20 كلمة)",
+    "weight": نسبة الوزن (مثال: 0.20 لـ 20%),
+    "result": النتيجة الموزونة (score × weight × 10)
+  },
+  "المعيار الثاني": { ... },
+  ...
+}
+
+المعايير المطلوب تقييمها:
+${criteria.map((c) => `- ${c.name} (${c.scale}) - وزن: ${c.weight}`).join("\n")}
+
+مهم جداً:
+1. اكتب كل شيء بالعربية
+2. التفسير يجب أن يكون أقل من 20 كلمة
+3. النتيجة الموزونة = الدرجة × الوزن × 10 (لتحويلها إلى نطاق 1000)`;
+
+        userContent = `${prompt}\n\nإجابة المتقدم: ${userAnswer}\n\nقيّم الإجابة وفق المعايير المحددة وأرسل النتيجة بصيغة JSON كما هو موضح.`;
+      } else {
+        // Fallback to simple evaluation
+        systemContent =
+          "You are an expert evaluator. Respond with valid JSON containing 'score' (number 0-1000) and 'explanation' (string) fields. IMPORTANT: Your entire response must be in Arabic. The 'explanation' field must be written in clear, professional Arabic.";
+
+        userContent = `${prompt}\n\nUser's Answer: ${userAnswer}\n\nProvide your evaluation as JSON with 'score' (0-1000) and 'explanation' fields. Remember: Write the explanation in Arabic (اللغة العربية).`;
+      }
+
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         temperature: 0.15,
@@ -40,12 +89,11 @@ async function evaluateWithRetry(
         messages: [
           {
             role: "system",
-            content:
-              "You are an expert evaluator. Respond with valid JSON containing 'score' (number) and 'explanation' (string) fields. IMPORTANT: Your entire response must be in Arabic. The 'explanation' field must be written in clear, professional Arabic.",
+            content: systemContent,
           },
           {
             role: "user",
-            content: `${prompt}\n\nUser's Answer: ${userAnswer}\n\nProvide your evaluation as JSON with 'score' and 'explanation' fields. Remember: Write the explanation in Arabic (اللغة العربية).`,
+            content: userContent,
           },
         ],
       });
@@ -152,7 +200,11 @@ export async function POST(request: NextRequest) {
         const promptData: AIPromptData = field.ai_prompt;
         const promptText = buildPromptText(promptData);
 
-        const evaluation = await evaluateWithRetry(promptText, userAnswer);
+        const evaluation = await evaluateWithRetry(
+          promptText,
+          userAnswer,
+          promptData.rubric
+        );
 
         // Store evaluation using question_title as key
         evaluations[field.question_title] = {

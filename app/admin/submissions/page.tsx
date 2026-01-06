@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { CustomFilterDropdown } from "@/components/custom-filter-dropdown";
+import { SubmissionDetailModal } from "@/components/submission-detail-modal";
 
 // Safely parse JSON strings (returns null on failure)
 function safeParseJSON(str: string | null | undefined): any {
@@ -419,11 +420,6 @@ export default function SubmissionsPage() {
       wb,
       `submissions-${new Date().toISOString().split("T")[0]}.xlsx`
     );
-  };
-
-  const getFieldLabel = (fieldName: string) => {
-    const field = formFields.find((f) => f.field_name === fieldName);
-    return field?.label || fieldName;
   };
 
   const getFilterOptions = (field: FormField) => {
@@ -950,206 +946,11 @@ export default function SubmissionsPage() {
       )}
 
       {/* Detail Modal */}
-      <AnimatePresence>
-        {selectedSubmission && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedSubmission(null)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
-            />
-            <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {/* Modal Header */}
-                <div className="bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] p-6 text-white">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-2xl font-bold mb-1">
-                        تفاصيل النموذج
-                      </h2>
-                      <p className="text-white/80 text-sm">
-                        المرحلة {selectedSubmission.stage}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setSelectedSubmission(null)}
-                      className="p-2 hover:bg-white/10 rounded-xl transition-colors"
-                    >
-                      <X className="w-6 h-6" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Modal Content */}
-                <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                  <div className="space-y-6">
-                    {/* User Info */}
-                    <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-semibold text-gray-700">
-                          المستخدم:
-                        </span>
-                        <span className="text-gray-900">
-                          {selectedSubmission.user_email}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-semibold text-gray-700">
-                          النقاط:
-                        </span>
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-amber-100 text-amber-700">
-                          {selectedSubmission.score?.toFixed(1) || "0.0"}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-semibold text-gray-700">
-                          تاريخ التقديم:
-                        </span>
-                        <span className="text-gray-900">
-                          {new Date(
-                            selectedSubmission.created_at
-                          ).toLocaleString("en-US", {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Form Data with Scores */}
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-4">
-                        البيانات المقدمة
-                      </h3>
-                      <div className="space-y-3">
-                        {Object.entries(selectedSubmission.data || {})
-                          .sort(([fieldNameA], [fieldNameB]) => {
-                            const fieldA = formFields.find(
-                              (f) => f.field_name === fieldNameA
-                            );
-                            const fieldB = formFields.find(
-                              (f) => f.field_name === fieldNameB
-                            );
-                            return (
-                              (fieldA?.display_order || 999) -
-                              (fieldB?.display_order || 999)
-                            );
-                          })
-                          .map(([fieldName, value]) => {
-                            const field = formFields.find(
-                              (f) => f.field_name === fieldName
-                            );
-                            const hasWeight = field?.has_weight;
-                            const selectedOption =
-                              field?.options?.options?.find(
-                                (opt: any) => opt.value === value
-                              );
-                            const fieldScore = selectedOption?.weight || 0;
-
-                            // Get AI evaluation for this field
-                            const aiEvaluation =
-                              field?.question_title &&
-                              selectedSubmission.ai_evaluations
-                                ? selectedSubmission.ai_evaluations[
-                                    field.question_title
-                                  ]
-                                : null;
-
-                            return (
-                              <div
-                                key={fieldName}
-                                className={`${
-                                  hasWeight || field?.is_ai_calculated
-                                    ? "bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200"
-                                    : "bg-white border-2 border-gray-200"
-                                } rounded-xl p-4`}
-                              >
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="text-sm font-bold text-gray-800">
-                                    {getFieldLabel(fieldName)}
-                                  </div>
-                                  {hasWeight && (
-                                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-amber-500 text-white">
-                                      {fieldScore} / 100
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-gray-900">
-                                  {typeof value === "object"
-                                    ? JSON.stringify(value, null, 2)
-                                    : selectedOption?.label || String(value)}
-                                </div>
-
-                                {/* AI Evaluation Display */}
-                                {aiEvaluation && (
-                                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <span className="text-xs font-bold text-blue-900 flex items-center gap-1">
-                                        <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                                        تقييم الذكاء الاصطناعي
-                                      </span>
-                                      <span
-                                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${
-                                          aiEvaluation.evaluation?.score >= 70
-                                            ? "bg-green-500 text-white"
-                                            : aiEvaluation.evaluation?.score >=
-                                              40
-                                            ? "bg-yellow-500 text-white"
-                                            : "bg-red-500 text-white"
-                                        }`}
-                                      >
-                                        {aiEvaluation.evaluation?.score || 0} /
-                                        100
-                                      </span>
-                                    </div>
-                                    <p className="text-xs text-blue-800 leading-relaxed">
-                                      {aiEvaluation.evaluation?.explanation ||
-                                        "لا يوجد تفسير"}
-                                    </p>
-                                    {aiEvaluation.evaluation?.error && (
-                                      <p className="text-xs text-red-600 mt-2">
-                                        ⚠️ حدث خطأ في التقييم
-                                      </p>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-
-                        {/* Total Score */}
-                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-5 mt-4">
-                          <div className="flex items-center justify-between">
-                            <div className="text-lg font-bold text-gray-900">
-                              المجموع الكلي
-                            </div>
-                            <span className="inline-flex items-center px-5 py-2 rounded-full text-xl font-bold bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg">
-                              {selectedSubmission.score?.toFixed(1) || "0.0"} /{" "}
-                              {formFields.filter((f) => f.has_weight).length *
-                                1000}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            </div>
-          </>
-        )}
-      </AnimatePresence>
+      <SubmissionDetailModal
+        submission={selectedSubmission}
+        formFields={formFields}
+        onClose={() => setSelectedSubmission(null)}
+      />
     </div>
   );
 }

@@ -162,11 +162,31 @@ export function DynamicFormField({
 
       case "textarea":
         const maxWords = field.validation_rules?.maxWords;
+
+        const handleTextareaChange = (
+          e: React.ChangeEvent<HTMLTextAreaElement>
+        ) => {
+          const newValue = e.target.value;
+
+          if (maxWords) {
+            const words = newValue
+              .trim()
+              .split(/\s+/)
+              .filter((word: string) => word.length > 0);
+            if (words.length > maxWords) {
+              // Prevent exceeding max words
+              return;
+            }
+          }
+
+          onChange(newValue);
+        };
+
         return (
           <div className="space-y-2">
             <textarea
               value={value || ""}
-              onChange={(e) => onChange(e.target.value)}
+              onChange={handleTextareaChange}
               placeholder={field.placeholder || ""}
               disabled={isDisabled}
               required={field.is_required}

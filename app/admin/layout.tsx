@@ -14,6 +14,7 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
+  Mail,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -32,6 +33,7 @@ const navigation = [
       { name: "المرحلة 3", href: "/admin/stages/stage-3" },
     ],
   },
+  { name: "إدارة الدعوات", href: "/admin/invitations", icon: Mail },
   { name: "المشرفين", href: "/admin/admins", icon: Users },
   { name: "الإعدادات", href: "/admin/settings", icon: Settings },
 ];

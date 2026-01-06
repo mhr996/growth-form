@@ -77,13 +77,11 @@ export function EmailVerificationModal({
                   <Mail className="w-8 h-8 text-white" />
                 </motion.div>
                 <h2 className="text-2xl font-bold text-white mb-2">
-                  {step === "email"
-                    ? "تحقق من بريدك الإلكتروني"
-                    : "تم إرسال الرابط!"}
+                  {step === "email" ? "تحقق من بريدك الإلكتروني" : ""}
                 </h2>
-                <p className="text-white/90 text-sm">
+                <p className="text-white/90 ">
                   {step === "email"
-                    ? "للوصول إلى النموذج، يرجى التحقق من بريدك الإلكتروني أولاً"
+                    ? "للوصول إلى النموذج، يرجى استخدام رابط التحقق المرسل إلى بريدك الالكتروني"
                     : `تم إرسال رابط التحقق إلى ${email}`}
                 </p>
               </div>
@@ -149,14 +147,12 @@ export function EmailVerificationModal({
                     </motion.div>
 
                     <div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-2">
-                        تحقق من بريدك الإلكتروني
-                      </h3>
                       <p className="text-gray-600 mb-4">
-                        تم إرسال رابط التحقق إلى بريدك الإلكتروني. اضغط على
-                        الرابط للدخول إلى النموذج.
+                        تم إرسال رابط التحقق إلى بريدك الإلكتروني.
+                        <br />
+                        اضغط على الرابط المرسل لتأكيد بريدك الالكتروني والوصول
+                        إلى النموذج.
                       </p>
-                   
                     </div>
 
                     <button
@@ -165,7 +161,7 @@ export function EmailVerificationModal({
                       className="w-full mt-6 text-sm text-blue-600 hover:text-blue-900 transition-colors flex items-center justify-center gap-2"
                     >
                       <ArrowLeft className="w-4 h-4 rotate-180" />
-                      <span >تغيير البريد الإلكتروني</span>
+                      <span>تغيير البريد الإلكتروني</span>
                     </button>
                   </div>
                 )}
@@ -175,7 +171,7 @@ export function EmailVerificationModal({
               <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 text-center">
                 <p className="text-xs text-gray-500">
                   {step === "email"
-                    ? "سنرسل لك رمز تحقق مكون من 6 أرقام"
+                    ? ""
                     : "تحقق من بريدك الوارد أو البريد العشوائي"}
                 </p>
               </div>
