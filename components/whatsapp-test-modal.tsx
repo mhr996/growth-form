@@ -12,9 +12,7 @@ export function WhatsAppTestModal({ isOpen, onClose }: WhatsAppTestModalProps) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [template, setTemplate] = useState("");
   const [param1, setParam1] = useState("");
-  const [param2, setParam2] = useState("");
-  const [buttonText, setButtonText] = useState("");
-  const [urlButton, setUrlButton] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{
     success: boolean;
@@ -44,9 +42,7 @@ export function WhatsAppTestModal({ isOpen, onClose }: WhatsAppTestModalProps) {
           phone: phoneNumber,
           template: template,
           param_1: param1 || undefined,
-          param_2: param2 || undefined,
-          button_text: buttonText || undefined,
-          url_button: urlButton || undefined,
+          image: imageUrl || undefined,
         }),
       });
 
@@ -57,9 +53,7 @@ export function WhatsAppTestModal({ isOpen, onClose }: WhatsAppTestModalProps) {
         setPhoneNumber("");
         setTemplate("");
         setParam1("");
-        setButtonText("");
-        setParam2("");
-        setUrlButton("");
+        setImageUrl("");
       } else {
         setResult({
           success: false,
@@ -78,9 +72,7 @@ export function WhatsAppTestModal({ isOpen, onClose }: WhatsAppTestModalProps) {
     setPhoneNumber("");
     setTemplate("");
     setParam1("");
-    setButtonText("");
-    setParam2("");
-    setUrlButton("");
+    setImageUrl("");
     setResult(null);
     onClose();
   };
@@ -169,15 +161,6 @@ export function WhatsAppTestModal({ isOpen, onClose }: WhatsAppTestModalProps) {
               </p>
             </div>
 
-            {/* Info Box */}
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-xs text-blue-700">
-                <strong>ملاحظة:</strong> إذا كان القالب يحتوي على متغيرات (مثل{" "}
-                {"{{1}}"}، {"{{2}}"})، يجب إدخال قيم المعاملات المطلوبة. تحقق من
-                إعدادات القالب في WhatsApp Business API.
-              </p>
-            </div>
-
             {/* Parameter 1 Input */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -196,52 +179,22 @@ export function WhatsAppTestModal({ isOpen, onClose }: WhatsAppTestModalProps) {
               </p>
             </div>
 
-            {/* Parameter 2 Input */}
-            <div className="mb-4">
+            {/* Image URL Input */}
+            <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                معامل 2 (يحل محل {"{{2}}"} في القالب - اختياري)
+                رابط الصورة (اختياري)
               </label>
               <input
                 type="text"
-                value={param2}
-                onChange={(e) => setParam2(e.target.value)}
-                placeholder="مثال: أحمد"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://example.com/image.jpg"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8E1538] focus:border-transparent outline-none transition-all"
                 disabled={sending}
               />
               <p className="text-xs text-gray-500 mt-1">
-                أدخل القيمة مباشرة (بدون أقواس)
+                رابط الصورة في القالب
               </p>
-            </div>
-
-            {/* Button Text Input */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                نص الزر (اختياري)
-              </label>
-              <input
-                type="text"
-                value={buttonText}
-                onChange={(e) => setButtonText(e.target.value)}
-                placeholder="مثال: انقر هنا"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8E1538] focus:border-transparent outline-none transition-all"
-                disabled={sending}
-              />
-            </div>
-
-            {/* URL Button Input */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                رابط الزر (اختياري)
-              </label>
-              <input
-                type="text"
-                value={urlButton}
-                onChange={(e) => setUrlButton(e.target.value)}
-                placeholder="https://example.com"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8E1538] focus:border-transparent outline-none transition-all"
-                disabled={sending}
-              />
             </div>
 
             {/* Result Message */}

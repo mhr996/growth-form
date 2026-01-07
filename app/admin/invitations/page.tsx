@@ -34,9 +34,7 @@ interface InvitationSettings {
   email_subject: string;
   email_content: string;
   whatsapp_template: string;
-  whatsapp_param_1: string | null;
-  whatsapp_param_2: string | null;
-  whatsapp_url_button: string | null;
+  whatsapp_image: string | null;
 }
 
 export default function InvitationsPage() {
@@ -51,14 +49,20 @@ export default function InvitationsPage() {
     email_subject: "",
     email_content: "",
     whatsapp_template: "",
-    whatsapp_param_1: null,
-    whatsapp_param_2: null,
-    whatsapp_url_button: null,
+    whatsapp_image: null,
   });
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingInvitee, setEditingInvitee] = useState<Invitee | null>(null);
+  const [sendingProgress, setSendingProgress] = useState({
+    current: 0,
+    total: 0,
+    emailsSent: 0,
+    whatsappsSent: 0,
+    errors: [] as string[],
+  });
+  const [showProgressModal, setShowProgressModal] = useState(false);
   const [newInvitee, setNewInvitee] = useState({
     name: "",
     email: "",
@@ -127,9 +131,7 @@ export default function InvitationsPage() {
           email_subject: settings.email_subject,
           email_content: settings.email_content,
           whatsapp_template: settings.whatsapp_template,
-          whatsapp_param_1: settings.whatsapp_param_1,
-          whatsapp_param_2: settings.whatsapp_param_2,
-          whatsapp_url_button: settings.whatsapp_url_button,
+          whatsapp_image: settings.whatsapp_image,
           updated_at: new Date().toISOString(),
         })
         .eq("id", settings.id);
@@ -259,12 +261,17 @@ export default function InvitationsPage() {
       return;
     }
 
-    if (!confirm(`هل تريد إرسال الدعوات إلى ${selectedInvitees.size} شخص؟`)) {
+    if (
+      !confirm(
+        `هل تريد إرسال الدعوات إلى ${selectedInvitees.size} شخص؟\n\nقد يستغرق هذا عدة دقائق حسب عدد المدعوين.`
+      )
+    ) {
       return;
     }
 
     try {
       setSending(true);
+      setShowProgressModal(true);
 
       // Verify user is authenticated before sending
       const {
@@ -272,6 +279,8 @@ export default function InvitationsPage() {
       } = await supabase.auth.getSession();
       if (!session) {
         alert("جلستك انتهت. الرجاء تسجيل الدخول مرة أخرى.");
+        setSending(false);
+        setShowProgressModal(false);
         return;
       }
 
@@ -279,39 +288,85 @@ export default function InvitationsPage() {
         selectedInvitees.has(inv.id)
       );
 
-      const response = await fetch("/api/send-invitations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          invitees: selectedInviteesList,
-          settings,
-        }),
+      // Initialize progress
+      setSendingProgress({
+        current: 0,
+        total: selectedInviteesList.length,
+        emailsSent: 0,
+        whatsappsSent: 0,
+        errors: [],
       });
 
-      const result = await response.json();
+      // Process in batches of 50
+      const BATCH_SIZE = 50;
+      const DELAY_BETWEEN_BATCHES = 2000; // 2 seconds
+      let totalEmailsSent = 0;
+      let totalWhatsappsSent = 0;
+      const allErrors: string[] = [];
 
-      if (response.status === 401) {
-        alert("غير مصرح. الرجاء تسجيل الدخول مرة أخرى.");
-        return;
+      for (let i = 0; i < selectedInviteesList.length; i += BATCH_SIZE) {
+        const batch = selectedInviteesList.slice(i, i + BATCH_SIZE);
+
+        const response = await fetch("/api/send-invitations", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            invitees: batch,
+            settings,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (response.status === 401) {
+          alert("غير مصرح. الرجاء تسجيل الدخول مرة أخرى.");
+          setSending(false);
+          setShowProgressModal(false);
+          return;
+        }
+
+        if (result.success) {
+          totalEmailsSent += result.emailsSent || 0;
+          totalWhatsappsSent += result.whatsappsSent || 0;
+          if (result.errors) {
+            allErrors.push(...result.errors);
+          }
+        }
+
+        // Update progress
+        setSendingProgress({
+          current: Math.min(i + BATCH_SIZE, selectedInviteesList.length),
+          total: selectedInviteesList.length,
+          emailsSent: totalEmailsSent,
+          whatsappsSent: totalWhatsappsSent,
+          errors: allErrors,
+        });
+
+        // Wait before next batch (unless it's the last batch)
+        if (i + BATCH_SIZE < selectedInviteesList.length) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, DELAY_BETWEEN_BATCHES)
+          );
+        }
       }
 
-      if (result.success) {
-        alert(
-          `تم إرسال الدعوات بنجاح!\n\nإيميلات: ${result.emailsSent}\nواتساب: ${result.whatsappsSent}`
-        );
-        setSelectedInvitees(new Set());
-        loadInvitees();
-      } else {
-        alert("حدث خطأ أثناء إرسال الدعوات: " + result.error);
-      }
+      // Show final results
+      alert(
+        `تم إرسال الدعوات بنجاح!\n\nإيميلات: ${totalEmailsSent}\nواتساب: ${totalWhatsappsSent}${
+          allErrors.length > 0 ? `\n\nأخطاء: ${allErrors.length}` : ""
+        }`
+      );
+      setSelectedInvitees(new Set());
+      loadInvitees();
     } catch (error) {
       console.error("Error sending invitations:", error);
       alert("حدث خطأ أثناء إرسال الدعوات");
     } finally {
       setSending(false);
+      setShowProgressModal(false);
     }
   };
 
@@ -343,7 +398,6 @@ export default function InvitationsPage() {
             إرسال دعوات التسجيل عبر البريد الإلكتروني والواتساب
           </p>
         </div>
-
         {/* Tabs */}
         <div className="flex gap-4 mb-6 border-b border-gray-200">
           <button
@@ -373,7 +427,6 @@ export default function InvitationsPage() {
             </div>
           </button>
         </div>
-
         <AnimatePresence mode="wait">
           {activeTab === "content" ? (
             <motion.div
@@ -456,58 +509,26 @@ export default function InvitationsPage() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          المعامل 1 (اختياري)
-                        </label>
-                        <input
-                          type="text"
-                          value={settings.whatsapp_param_1 || ""}
-                          onChange={(e) =>
-                            setSettings({
-                              ...settings,
-                              whatsapp_param_1: e.target.value,
-                            })
-                          }
-                          className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-[#2A3984] focus:ring-4 focus:ring-[#2A3984]/10 transition-all"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          المعامل 2 (اختياري)
-                        </label>
-                        <input
-                          type="text"
-                          value={settings.whatsapp_param_2 || ""}
-                          onChange={(e) =>
-                            setSettings({
-                              ...settings,
-                              whatsapp_param_2: e.target.value,
-                            })
-                          }
-                          className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-[#2A3984] focus:ring-4 focus:ring-[#2A3984]/10 transition-all"
-                        />
-                      </div>
-                    </div>
-
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        رابط الزر (اختياري)
+                        رابط الصورة (اختياري)
                       </label>
                       <input
                         type="text"
-                        value={settings.whatsapp_url_button || ""}
+                        value={settings.whatsapp_image || ""}
                         onChange={(e) =>
                           setSettings({
                             ...settings,
-                            whatsapp_url_button: e.target.value,
+                            whatsapp_image: e.target.value,
                           })
                         }
                         className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-[#2A3984] focus:ring-4 focus:ring-[#2A3984]/10 transition-all"
-                        placeholder="https://example.com/register"
+                        placeholder="https://example.com/image.jpg"
                       />
+                      <p className="text-xs text-gray-500 mt-1">
+                        رابط الصورة في القالب (سيتم استخدام اسم المدعو تلقائياً
+                        كمعامل أول)
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -793,12 +814,12 @@ export default function InvitationsPage() {
                               <td className="px-6 py-4">
                                 <div className="flex gap-2">
                                   {invitee.email_sent && (
-                                    <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
+                                    <span className="px-2 py-1 bg-blue-100 text-blue-700 text-sm rounded-full">
                                       📧
                                     </span>
                                   )}
                                   {invitee.whatsapp_sent && (
-                                    <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                                    <span className="px-2 py-1 bg-green-100 text-green-700 text-sm rounded-full">
                                       📱
                                     </span>
                                   )}
@@ -853,7 +874,6 @@ export default function InvitationsPage() {
             </motion.div>
           )}
         </AnimatePresence>
-
         {/* Add Invitee Modal */}
         <AnimatePresence>
           {showAddModal && (
@@ -956,6 +976,100 @@ export default function InvitationsPage() {
             </motion.div>
           )}
         </AnimatePresence>
+        {/* Progress Modal */}
+        <AnimatePresence>
+          {showProgressModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8"
+              >
+                <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">
+                  جاري إرسال الدعوات
+                </h2>
+
+                <div className="space-y-6">
+                  {/* Progress Bar */}
+                  <div>
+                    <div className="flex justify-between text-sm text-gray-600 mb-2">
+                      <span>التقدم</span>
+                      <span>
+                        {sendingProgress.current} / {sendingProgress.total}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{
+                          width: `${
+                            (sendingProgress.current / sendingProgress.total) *
+                            100
+                          }%`,
+                        }}
+                        transition={{ duration: 0.3 }}
+                        className="h-full bg-gradient-to-r from-[#2A3984] to-[#3a4a9f]"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2 text-center">
+                      {sendingProgress.current === sendingProgress.total
+                        ? "اكتمل الإرسال!"
+                        : "يرجى الانتظار، قد يستغرق هذا عدة دقائق..."}
+                    </p>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-blue-50 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {sendingProgress.emailsSent}
+                      </div>
+                      <div className="text-sm text-gray-600">إيميلات</div>
+                    </div>
+                    <div className="bg-green-50 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold text-green-600">
+                        {sendingProgress.whatsappsSent}
+                      </div>
+                      <div className="text-sm text-gray-600">واتساب</div>
+                    </div>
+                  </div>
+
+                  {/* Errors */}
+                  {sendingProgress.errors.length > 0 && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="text-sm font-semibold text-red-800 mb-2">
+                        أخطاء ({sendingProgress.errors.length}):
+                      </div>
+                      <div className="max-h-32 overflow-y-auto text-xs text-red-700 space-y-1">
+                        {sendingProgress.errors.slice(0, 5).map((err, idx) => (
+                          <div key={idx}>• {err}</div>
+                        ))}
+                        {sendingProgress.errors.length > 5 && (
+                          <div className="text-red-600 font-semibold mt-2">
+                            ... و {sendingProgress.errors.length - 5} أخطاء أخرى
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Loading Animation */}
+                  {sending && (
+                    <div className="flex justify-center">
+                      <Loader2 className="w-8 h-8 animate-spin text-[#2A3984]" />
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>{" "}
       </div>
     </div>
   );

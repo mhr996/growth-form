@@ -259,7 +259,6 @@ export default function Home() {
       return;
     }
 
-    console.log("Form Data:", formValues);
 
     const supabase = createClient();
 
@@ -282,7 +281,6 @@ export default function Home() {
         }
       });
 
-      console.log("Calculated Score:", totalScore);
 
       const { data: submission, error } = await supabase
         .from("form_submissions")

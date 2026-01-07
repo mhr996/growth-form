@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
-    const { phone, template, param_1, param_2, url_button, button_text } =
-      await req.json();
+    const { phone, template, param_1, image } = await req.json();
 
     if (!phone || !template) {
       return NextResponse.json(
@@ -15,9 +14,7 @@ export async function POST(req: NextRequest) {
     // Trim all inputs to remove whitespace
     const trimmedTemplate = template.trim();
     const trimmedParam1 = param_1?.trim() || "";
-    const trimmedParam2 = param_2?.trim() || "";
-    const trimmedUrlButton = url_button?.trim() || "";
-    const trimmedButtonText = button_text?.trim() || "";
+    const trimmedImage = image?.trim() || "";
 
     // Format phone number: remove leading 00, +, spaces, dashes
     let formattedPhone = phone
@@ -49,34 +46,25 @@ export async function POST(req: NextRequest) {
     url.searchParams.append("phone", formattedPhone);
     url.searchParams.append("template", trimmedTemplate);
 
-    // Add optional parameters if provided (only if they have values)
+    // Add optional parameters if provided
     if (trimmedParam1) {
-      url.searchParams.append("name", trimmedParam1);
+      url.searchParams.append("param_1", trimmedParam1);
     }
-    if (trimmedParam2) {
-      url.searchParams.append("param_2", trimmedParam2);
-    }
-
-    // Handle button parameters separately (not as JSON)
-    if (trimmedButtonText) {
-      url.searchParams.append("button_text", trimmedButtonText);
-    }
-    if (trimmedUrlButton) {
-      url.searchParams.append("url_button", trimmedUrlButton);
+    if (trimmedImage) {
+      url.searchParams.append("image", trimmedImage);
     }
 
     console.log("WhatsApp API Request:", {
       phone: formattedPhone,
       template: trimmedTemplate,
-      name: trimmedParam1 || "not provided",
-      param_2: trimmedParam2 || "not provided",
-      button_text: trimmedButtonText || "not provided",
-      url_button: trimmedUrlButton || "not provided",
+      param_1: trimmedParam1 || "not provided",
+      image: trimmedImage || "not provided",
       fullUrl: url.toString(),
     });
 
     const response = await fetch(url.toString(), {
       method: "POST",
+      body: "",
       redirect: "follow",
     });
 

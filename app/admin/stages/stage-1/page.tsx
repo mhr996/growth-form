@@ -300,10 +300,47 @@ export default function Stage1Page() {
         prev.map((f) => (f.id === updatedField.id ? updatedField : f))
       );
 
-      setMessage({
-        type: "success",
-        text: "تم حفظ التغييرات بنجاح!",
-      });
+      // If weights were changed, recalculate all submission scores
+      if (updatedField.has_weight && updatedField.options?.options) {
+        try {
+          const response = await fetch("/api/recalculate-scores", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            credentials: "include",
+            body: JSON.stringify({
+              fieldId: updatedField.id,
+              stage: 1,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok && result.success) {
+            setMessage({
+              type: "success",
+              text: `تم حفظ التغييرات بنجاح! تم إعادة حساب النتائج لـ ${result.updatedCount} طلب`,
+            });
+          } else {
+            setMessage({
+              type: "success",
+              text: "تم حفظ التغييرات بنجاح!",
+            });
+          }
+        } catch (recalcError) {
+          console.error("Error recalculating scores:", recalcError);
+          setMessage({
+            type: "success",
+            text: "تم حفظ التغييرات بنجاح! (فشل إعادة حساب النتائج)",
+          });
+        }
+      } else {
+        setMessage({
+          type: "success",
+          text: "تم حفظ التغييرات بنجاح!",
+        });
+      }
 
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {

@@ -127,7 +127,7 @@ export function SubmissionDetailModal({
                 تقييم الذكاء الاصطناعي - تفصيل المعايير
               </span>
               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-                المجموع: {totalScore.toFixed(1)} / 1000
+                المجموع: {totalScore.toFixed(1)}
               </span>
             </div>
             <div className="space-y-2">
@@ -158,6 +158,9 @@ export function SubmissionDetailModal({
                 const result =
                   typeof data.result === "number" ? data.result : 0;
                 const explanation = data.explanation || "";
+                // Extract scale from data if available
+                const scale =
+                  typeof data.scale === "number" ? data.scale : null;
 
                 return (
                   <div
@@ -170,7 +173,8 @@ export function SubmissionDetailModal({
                       </span>
                       <div className="flex flex-col items-end gap-1">
                         <span className="text-xs font-bold text-blue-600">
-                          {score} / 100
+                          {score}
+                          {scale ? ` / ${scale}` : ""}
                         </span>
                         <span className="text-xs text-gray-500">
                           الوزن: {(weight * 100).toFixed(0)}%
@@ -218,7 +222,7 @@ export function SubmissionDetailModal({
                   : "bg-red-500 text-white"
               }`}
             >
-              {score} / 1000
+              {score}
             </span>
           </div>
           {evaluation.explanation &&

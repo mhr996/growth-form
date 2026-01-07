@@ -55,10 +55,13 @@ export async function POST(req: NextRequest) {
       // Send email if email exists
       if (invitee.email && settings.email_subject && settings.email_content) {
         try {
+          // Add personalized greeting with invitee's name before the content
+          const personalizedContent = `مرحباً ${invitee.name}\n\n${settings.email_content}`;
+
           const emailResult = await sendEmail(
             invitee.email,
             settings.email_subject,
-            settings.email_content
+            personalizedContent
           );
 
           if (emailResult.success) {
@@ -89,12 +92,22 @@ export async function POST(req: NextRequest) {
             continue;
           }
 
-          // Format phone number: remove leading 00, +, spaces, dashes
-          const formattedPhone = invitee.phone
+          // Format phone number for Saudi Arabia
+          let formattedPhone = invitee.phone
             .replace(/^\+/, "") // Remove leading +
             .replace(/^00/, "") // Remove leading 00
             .replace(/[\s\-()]/g, "") // Remove spaces, dashes, parentheses
             .trim();
+
+          // Handle Saudi numbers: convert 05xxxxxxxx or 5xxxxxxxx to 9665xxxxxxxx
+          if (formattedPhone.startsWith("05")) {
+            formattedPhone = "966" + formattedPhone.substring(1); // Remove 0, add 966
+          } else if (
+            formattedPhone.startsWith("5") &&
+            !formattedPhone.startsWith("966")
+          ) {
+            formattedPhone = "966" + formattedPhone; // Add 966
+          }
 
           const whatsappUrl = new URL(process.env.WHATSAPP_API);
           whatsappUrl.searchParams.append(
@@ -111,24 +124,17 @@ export async function POST(req: NextRequest) {
             settings.whatsapp_template
           );
 
-          if (settings.whatsapp_param_1) {
-            whatsappUrl.searchParams.append("name", settings.whatsapp_param_1);
-          }
-          if (settings.whatsapp_param_2) {
-            whatsappUrl.searchParams.append(
-              "param_2",
-              settings.whatsapp_param_2
-            );
-          }
-          if (settings.whatsapp_url_button) {
-            whatsappUrl.searchParams.append(
-              "url_button",
-              settings.whatsapp_url_button
-            );
+          // Always use invitee's name for param_1
+          whatsappUrl.searchParams.append("param_1", invitee.name);
+
+          // Add image if provided
+          if (settings.whatsapp_image) {
+            whatsappUrl.searchParams.append("image", settings.whatsapp_image);
           }
 
           const whatsappResponse = await fetch(whatsappUrl.toString(), {
             method: "POST",
+            body: "",
             redirect: "follow",
           });
 
