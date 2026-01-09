@@ -40,10 +40,12 @@ export default function Home() {
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [showStageClosedModal, setShowStageClosedModal] = useState(false);
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
   const [isFormLocked, setIsFormLocked] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [checkingSubmission, setCheckingSubmission] = useState(true);
+  const [isStageClosed, setIsStageClosed] = useState(false);
   const { user, loading } = useAuth();
   const [formFields, setFormFields] = useState<FormFieldData[]>([]);
   const [formValues, setFormValues] = useState<Record<string, any>>({});
@@ -53,6 +55,7 @@ export default function Home() {
     welcome_message: string;
     user_agreement: string;
     success_message: string;
+    status?: string;
   } | null>(null);
 
   // Check if user has already submitted (do this FIRST before showing welcome modal)
@@ -119,18 +122,22 @@ export default function Home() {
     }
   }, [currentStep, user, hasAcceptedTerms, isFormLocked]);
 
-  // Load stage settings
+  // Load stage settings and check if stage is closed
   useEffect(() => {
     const fetchStageSettings = async () => {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("stage_settings")
-        .select("welcome_message, user_agreement, success_message")
+        .select("welcome_message, user_agreement, success_message, status")
         .eq("stage", currentStep)
         .single();
 
       if (!error && data) {
         setStageSettings(data);
+        if (data.status === "closed") {
+          setIsStageClosed(true);
+          setShowStageClosedModal(true);
+        }
       }
     };
 
@@ -139,6 +146,11 @@ export default function Home() {
 
   // Check if user is authenticated and show appropriate modal
   useEffect(() => {
+    if (isStageClosed) {
+      // If stage is closed, don't show any other modals
+      return;
+    }
+
     if (!loading && !user) {
       setShowVerificationModal(true);
       setHasAcceptedTerms(false);
@@ -152,7 +164,14 @@ export default function Home() {
       // Only show welcome modal if user hasn't submitted and we've finished checking
       setShowWelcomeModal(true);
     }
-  }, [user, loading, hasAcceptedTerms, isFormLocked, checkingSubmission]);
+  }, [
+    user,
+    loading,
+    hasAcceptedTerms,
+    isFormLocked,
+    checkingSubmission,
+    isStageClosed,
+  ]);
 
   const handleVerified = () => {
     setShowVerificationModal(false);
@@ -259,7 +278,6 @@ export default function Home() {
       return;
     }
 
-
     const supabase = createClient();
 
     try {
@@ -280,7 +298,6 @@ export default function Home() {
           }
         }
       });
-
 
       const { data: submission, error } = await supabase
         .from("form_submissions")
@@ -461,7 +478,8 @@ export default function Home() {
                     transition={{ delay: 0.4 }}
                     className="text-center text-gray-600 text-lg leading-relaxed mb-10 whitespace-pre-line max-w-2xl mx-auto"
                   >
-                    {stageSettings.success_message || "شكراً لك! تم استلام طلبك وسيتم مراجعته قريباً."}
+                    {stageSettings.success_message ||
+                      "شكراً لك! تم استلام طلبك وسيتم مراجعته قريباً."}
                   </motion.div>
 
                   {/* Decorative Element */}
@@ -485,59 +503,59 @@ export default function Home() {
                 transition={{ duration: 0.6, delay: 0.2 }}
                 className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden"
               >
-            {/* Header with Gradient */}
-            <div className="relative bg-gradient-to-br from-[#2A3984] via-[#2A3984] to-[#1e2a5c] px-8 py-8 sm:py-10">
-              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLW9wYWNpdHk9IjAuMDUiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-40"></div>
-              <div className="relative">
-                <motion.h1
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                  className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white text-center mb-3"
-                >
-                  نموذج التسجيل في برنامج Growth Plus
-                </motion.h1>
-                <motion.p
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
-                  className="text-white/90 text-center text-sm sm:text-base"
-                >
-                  يرجى ملء البيانات المطلوبة بدقة واهتمام
-                </motion.p>
-              </div>
-            </div>
-
-            {/* Stepper */}
-            <div className="px-6 sm:px-10 py-8 border-b border-gray-100">
-              <div className="flex items-center justify-between relative">
-                {/* Progress Line */}
-                <div className="absolute right-0 top-1/2 h-1 w-full -translate-y-1/2 bg-gray-100 rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full bg-gradient-to-r from-[#2A3984] to-[#3a4a9f]"
-                    initial={{ width: "0%" }}
-                    animate={{
-                      width: `${
-                        ((currentStep - 1) / (STEPS.length - 1)) * 100
-                      }%`,
-                    }}
-                    transition={{ duration: 0.5, ease: "easeInOut" }}
-                  />
+                {/* Header with Gradient */}
+                <div className="relative bg-gradient-to-br from-[#2A3984] via-[#2A3984] to-[#1e2a5c] px-8 py-8 sm:py-10">
+                  <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLW9wYWNpdHk9IjAuMDUiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-40"></div>
+                  <div className="relative">
+                    <motion.h1
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.4 }}
+                      className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white text-center mb-3"
+                    >
+                      نموذج التسجيل في برنامج Growth Plus
+                    </motion.h1>
+                    <motion.p
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.5 }}
+                      className="text-white/90 text-center text-sm sm:text-base"
+                    >
+                      يرجى ملء البيانات المطلوبة بدقة واهتمام
+                    </motion.p>
+                  </div>
                 </div>
 
-                {/* Steps */}
-                {STEPS.map((step, index) => {
-                  const stepNumber = index + 1;
-                  const isCompleted = stepNumber < currentStep;
-                  const isCurrent = stepNumber === currentStep;
-
-                  return (
-                    <div
-                      key={step.id}
-                      className="flex flex-col items-center gap-3 relative z-10"
-                    >
+                {/* Stepper */}
+                <div className="px-6 sm:px-10 py-8 border-b border-gray-100">
+                  <div className="flex items-center justify-between relative">
+                    {/* Progress Line */}
+                    <div className="absolute right-0 top-1/2 h-1 w-full -translate-y-1/2 bg-gray-100 rounded-full overflow-hidden">
                       <motion.div
-                        className={`
+                        className="h-full bg-gradient-to-r from-[#2A3984] to-[#3a4a9f]"
+                        initial={{ width: "0%" }}
+                        animate={{
+                          width: `${
+                            ((currentStep - 1) / (STEPS.length - 1)) * 100
+                          }%`,
+                        }}
+                        transition={{ duration: 0.5, ease: "easeInOut" }}
+                      />
+                    </div>
+
+                    {/* Steps */}
+                    {STEPS.map((step, index) => {
+                      const stepNumber = index + 1;
+                      const isCompleted = stepNumber < currentStep;
+                      const isCurrent = stepNumber === currentStep;
+
+                      return (
+                        <div
+                          key={step.id}
+                          className="flex flex-col items-center gap-3 relative z-10"
+                        >
+                          <motion.div
+                            className={`
                           w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center font-bold text-base sm:text-lg
                           transition-all duration-300 shadow-lg
                           ${
@@ -556,30 +574,30 @@ export default function Home() {
                               : ""
                           }
                         `}
-                        animate={{
-                          scale: isCurrent ? 1.1 : isCompleted ? 1 : 0.95,
-                        }}
-                      >
-                        {isCompleted ? (
-                          <svg
-                            className="w-7 h-7"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
+                            animate={{
+                              scale: isCurrent ? 1.1 : isCompleted ? 1 : 0.95,
+                            }}
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={3}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                        ) : (
-                          stepNumber
-                        )}
-                      </motion.div>
-                      <span
-                        className={`
+                            {isCompleted ? (
+                              <svg
+                                className="w-7 h-7"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={3}
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                            ) : (
+                              stepNumber
+                            )}
+                          </motion.div>
+                          <span
+                            className={`
                           text-xs sm:text-sm font-medium text-center mt-3 max-w-[200px]
                           ${
                             isCompleted || isCurrent
@@ -587,47 +605,209 @@ export default function Home() {
                               : "text-gray-400"
                           }
                         `}
-                      >
-                        {step.label}
-                      </span>
+                          >
+                            {step.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Form */}
+                <div className="px-6 sm:px-10 py-10">
+                  {!user || !hasAcceptedTerms ? (
+                    // Show skeleton/loading state when not authenticated or terms not accepted
+                    <div className="space-y-6">
+                      <div className="animate-pulse">
+                        <div className="h-4 bg-gray-200 rounded w-1/4 mb-3"></div>
+                        <div className="h-14 bg-gray-200 rounded-xl"></div>
+                      </div>
+                      <div className="animate-pulse">
+                        <div className="h-4 bg-gray-200 rounded w-1/3 mb-3"></div>
+                        <div className="h-14 bg-gray-200 rounded-xl"></div>
+                      </div>
+                      <div className="animate-pulse">
+                        <div className="h-4 bg-gray-200 rounded w-1/4 mb-3"></div>
+                        <div className="h-14 bg-gray-200 rounded-xl"></div>
+                      </div>
+                      <div className="animate-pulse">
+                        <div className="h-4 bg-gray-200 rounded w-1/3 mb-3"></div>
+                        <div className="h-14 bg-gray-200 rounded-xl"></div>
+                      </div>
+                      <div className="animate-pulse">
+                        <div className="h-4 bg-gray-200 rounded w-1/4 mb-3"></div>
+                        <div className="h-14 bg-gray-200 rounded-xl"></div>
+                      </div>
+
+                      {/* Overlay message */}
+                      <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-3xl">
+                        <div className="text-center p-8 bg-white rounded-2xl shadow-xl border-2 border-[#2A3984]/20">
+                          <div className="w-16 h-16 bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] rounded-full flex items-center justify-center mx-auto">
+                            <svg
+                              className="w-8 h-8 text-white"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                              />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
+                  ) : loadingFields ? (
+                    // Loading fields from database
+                    <div className="space-y-6 relative">
+                      <div className="animate-pulse">
+                        <div className="h-4 bg-gray-200 rounded w-1/4 mb-3"></div>
+                        <div className="h-14 bg-gray-200 rounded-xl"></div>
+                      </div>
+                      <div className="animate-pulse">
+                        <div className="h-4 bg-gray-200 rounded w-1/3 mb-3"></div>
+                        <div className="h-14 bg-gray-200 rounded-xl"></div>
+                      </div>
+                      {isFormLocked && (
+                        <div className="absolute inset-0  backdrop-blur-sm rounded-3xl z-10 flex items-center justify-center">
+                          <div className="text-center p-8 bg-white rounded-2xl shadow-xl border-2 border-green-500/30">
+                            <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                              <svg
+                                className="w-12 h-12 text-white"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={3}
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-800 mb-2">
+                              مرحباً بك مرة أخرى
+                            </h3>
+                            <p className="text-gray-600">
+                              تم استقبال طلبك مسبقاً، انتظر النتيجة خلال الساعات
+                              القادمة
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // Show actual form when authenticated and fields loaded
+                    <motion.form
+                      onSubmit={onSubmit}
+                      className="space-y-6 relative"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.3 }}
+                    >
+                      {/* Form Locked Overlay */}
+                      {isFormLocked && (
+                        <div className="absolute inset-0 backdrop-blur-sm rounded-3xl z-10 flex items-center justify-center">
+                          <div className="text-center p-8 bg-white rounded-2xl shadow-xl border-2 border-green-500/30">
+                            <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                              <svg
+                                className="w-12 h-12 text-white"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={3}
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-800 mb-2">
+                              مرحباً بك مرة أخرى
+                            </h3>
+                            <p className="text-gray-600">
+                              تم استقبال طلبك مسبقاً، انتظر النتيجة خلال الساعات
+                              القادمة
+                            </p>
+                          </div>
+                        </div>
+                      )}
 
-            {/* Form */}
-            <div className="px-6 sm:px-10 py-10">
-              {!user || !hasAcceptedTerms ? (
-                // Show skeleton/loading state when not authenticated or terms not accepted
-                <div className="space-y-6">
-                  <div className="animate-pulse">
-                    <div className="h-4 bg-gray-200 rounded w-1/4 mb-3"></div>
-                    <div className="h-14 bg-gray-200 rounded-xl"></div>
-                  </div>
-                  <div className="animate-pulse">
-                    <div className="h-4 bg-gray-200 rounded w-1/3 mb-3"></div>
-                    <div className="h-14 bg-gray-200 rounded-xl"></div>
-                  </div>
-                  <div className="animate-pulse">
-                    <div className="h-4 bg-gray-200 rounded w-1/4 mb-3"></div>
-                    <div className="h-14 bg-gray-200 rounded-xl"></div>
-                  </div>
-                  <div className="animate-pulse">
-                    <div className="h-4 bg-gray-200 rounded w-1/3 mb-3"></div>
-                    <div className="h-14 bg-gray-200 rounded-xl"></div>
-                  </div>
-                  <div className="animate-pulse">
-                    <div className="h-4 bg-gray-200 rounded w-1/4 mb-3"></div>
-                    <div className="h-14 bg-gray-200 rounded-xl"></div>
-                  </div>
+                      {/* Dynamic Fields - 2 columns grid with full-width support */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {formFields.map((field) => {
+                          // Check if field should be shown based on conditional rules
+                          const shouldShow = () => {
+                            if (!field.validation_rules?.conditional)
+                              return true;
 
-                  {/* Overlay message */}
-                  <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-3xl">
-                    <div className="text-center p-8 bg-white rounded-2xl shadow-xl border-2 border-[#2A3984]/20">
-                      <div className="w-16 h-16 bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] rounded-full flex items-center justify-center mx-auto">
+                            const {
+                              field: condField,
+                              operator,
+                              values,
+                              value: condRequiredValue,
+                            } = field.validation_rules.conditional;
+                            const condValue = formValues[condField];
+
+                            if (operator === "in") {
+                              return values.includes(condValue);
+                            }
+                            if (operator === "equals") {
+                              return condValue === condRequiredValue;
+                            }
+
+                            return true;
+                          };
+
+                          if (!shouldShow()) return null;
+
+                          return (
+                            <div
+                              key={field.id}
+                              className={
+                                field.full_width ? "md:col-span-2" : ""
+                              }
+                            >
+                              <DynamicFormField
+                                field={field}
+                                value={formValues[field.field_name]}
+                                onChange={(value) =>
+                                  setFormValues((prev) => ({
+                                    ...prev,
+                                    [field.field_name]: value,
+                                  }))
+                                }
+                                error={formErrors[field.field_name]}
+                                userEmail={user?.email}
+                                formValues={formValues}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Submit Button */}
+                      <motion.button
+                        type="submit"
+                        disabled={isFormLocked}
+                        whileHover={{ scale: isFormLocked ? 1 : 1.02 }}
+                        whileTap={{ scale: isFormLocked ? 1 : 0.98 }}
+                        className={`w-full mt-8 px-8 py-5 rounded-xl font-bold text-lg shadow-xl transition-all duration-300 flex items-center justify-center gap-3 ${
+                          isFormLocked
+                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            : "bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] text-white hover:shadow-2xl"
+                        }`}
+                      >
+                        <span>إرسال</span>
                         <svg
-                          className="w-8 h-8 text-white"
+                          className="w-6 h-6"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -635,175 +815,16 @@ export default function Home() {
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                            strokeWidth={2.5}
+                            d="M15 19l-7-7 7-7"
                           />
                         </svg>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : loadingFields ? (
-                // Loading fields from database
-                <div className="space-y-6 relative">
-                  <div className="animate-pulse">
-                    <div className="h-4 bg-gray-200 rounded w-1/4 mb-3"></div>
-                    <div className="h-14 bg-gray-200 rounded-xl"></div>
-                  </div>
-                  <div className="animate-pulse">
-                    <div className="h-4 bg-gray-200 rounded w-1/3 mb-3"></div>
-                    <div className="h-14 bg-gray-200 rounded-xl"></div>
-                  </div>
-                  {isFormLocked && (
-                    <div className="absolute inset-0  backdrop-blur-sm rounded-3xl z-10 flex items-center justify-center">
-                      <div className="text-center p-8 bg-white rounded-2xl shadow-xl border-2 border-green-500/30">
-                        <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <svg
-                            className="w-12 h-12 text-white"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={3}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                        </div>
-                        <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                          مرحباً بك مرة أخرى
-                        </h3>
-                        <p className="text-gray-600">
-                          تم استقبال طلبك مسبقاً، انتظر النتيجة خلال الساعات
-                          القادمة
-                        </p>
-                      </div>
-                    </div>
+                      </motion.button>
+                    </motion.form>
                   )}
                 </div>
-              ) : (
-                // Show actual form when authenticated and fields loaded
-                <motion.form
-                  onSubmit={onSubmit}
-                  className="space-y-6 relative"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  {/* Form Locked Overlay */}
-                  {isFormLocked && (
-                    <div className="absolute inset-0 backdrop-blur-sm rounded-3xl z-10 flex items-center justify-center">
-                      <div className="text-center p-8 bg-white rounded-2xl shadow-xl border-2 border-green-500/30">
-                        <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <svg
-                            className="w-12 h-12 text-white"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={3}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                        </div>
-                        <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                          مرحباً بك مرة أخرى
-                        </h3>
-                        <p className="text-gray-600">
-                          تم استقبال طلبك مسبقاً، انتظر النتيجة خلال الساعات
-                          القادمة
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Dynamic Fields - 2 columns grid with full-width support */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {formFields.map((field) => {
-                      // Check if field should be shown based on conditional rules
-                      const shouldShow = () => {
-                        if (!field.validation_rules?.conditional) return true;
-
-                        const {
-                          field: condField,
-                          operator,
-                          values,
-                          value: condRequiredValue,
-                        } = field.validation_rules.conditional;
-                        const condValue = formValues[condField];
-
-                        if (operator === "in") {
-                          return values.includes(condValue);
-                        }
-                        if (operator === "equals") {
-                          return condValue === condRequiredValue;
-                        }
-
-                        return true;
-                      };
-
-                      if (!shouldShow()) return null;
-
-                      return (
-                        <div
-                          key={field.id}
-                          className={field.full_width ? "md:col-span-2" : ""}
-                        >
-                          <DynamicFormField
-                            field={field}
-                            value={formValues[field.field_name]}
-                            onChange={(value) =>
-                              setFormValues((prev) => ({
-                                ...prev,
-                                [field.field_name]: value,
-                              }))
-                            }
-                            error={formErrors[field.field_name]}
-                            userEmail={user?.email}
-                            formValues={formValues}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Submit Button */}
-                  <motion.button
-                    type="submit"
-                    disabled={isFormLocked}
-                    whileHover={{ scale: isFormLocked ? 1 : 1.02 }}
-                    whileTap={{ scale: isFormLocked ? 1 : 0.98 }}
-                    className={`w-full mt-8 px-8 py-5 rounded-xl font-bold text-lg shadow-xl transition-all duration-300 flex items-center justify-center gap-3 ${
-                      isFormLocked
-                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                        : "bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] text-white hover:shadow-2xl"
-                    }`}
-                  >
-                    <span>إرسال</span>
-                    <svg
-                      className="w-6 h-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2.5}
-                        d="M15 19l-7-7 7-7"
-                      />
-                    </svg>
-                  </motion.button>
-                </motion.form>
-              )}
-            </div>
-          </motion.div>
-          )}
+              </motion.div>
+            )}
           </AnimatePresence>
 
           {/* Footer */}
@@ -845,6 +866,51 @@ export default function Home() {
         welcomeMessage={stageSettings?.welcome_message || ""}
         userAgreement={stageSettings?.user_agreement || ""}
       />
+
+      {/* Stage Closed Modal */}
+      <AnimatePresence>
+        {showStageClosedModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center"
+            >
+              <div className="mb-6">
+                <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg
+                    className="w-10 h-10 text-red-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                  انتهت المرحلة
+                </h2>
+                <p className="text-gray-600 text-lg">
+                  عذراً، هذه المرحلة قد انتهت ولا يمكن تقديم طلبات جديدة في
+                  الوقت الحالي.
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <WhatsAppTestModal
         isOpen={showWhatsAppModal}
         onClose={() => setShowWhatsAppModal(false)}
