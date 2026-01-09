@@ -54,6 +54,7 @@ export function generateEmailHTML(
       max-width: 100%;
       height: auto;
       margin-top: 20px;
+      margin-bottom: 10px;
       border-radius: 8px;
       display: block;
     }
@@ -77,12 +78,12 @@ export function generateEmailHTML(
       <img src="${logoUrl}" alt="Logo" class="logo" />
     </div>
     <div class="email-body">
-      <div class="content">${content}</div>
       ${
         imageUrl
           ? `<img src="${imageUrl}" alt="الصورة" class="content-image" />`
           : ""
       }
+      <div class="content">${content}</div>
     </div>
     <div class="email-footer">
       <p>هذا البريد الإلكتروني تم إرساله تلقائياً، يرجى عدم الرد عليه.</p>
