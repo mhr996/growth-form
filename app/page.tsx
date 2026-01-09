@@ -796,7 +796,7 @@ export default function Home() {
                       {/* Submit Button */}
                       <motion.button
                         type="submit"
-                        disabled={isFormLocked}
+                        disabled={true}
                         whileHover={{ scale: isFormLocked ? 1 : 1.02 }}
                         whileTap={{ scale: isFormLocked ? 1 : 0.98 }}
                         className={`w-full mt-8 px-8 py-5 rounded-xl font-bold text-lg shadow-xl transition-all duration-300 flex items-center justify-center gap-3 ${
