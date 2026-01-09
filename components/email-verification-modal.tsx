@@ -77,7 +77,7 @@ export function EmailVerificationModal({
                   <Mail className="w-8 h-8 text-white" />
                 </motion.div>
                 <h2 className="text-2xl font-bold text-white mb-2">
-                  {step === "email" ? "تحقق من بريدك الإلكتروني" : ""}
+                  {step === "email" ? "التحقق من البريد الإلكتروني" : ""}
                 </h2>
                 <p className="text-white/90 ">
                   {step === "email"
@@ -129,7 +129,7 @@ export function EmailVerificationModal({
                         </>
                       ) : (
                         <>
-                          <span>إرسال رابط التحقق</span>
+                          <span>إرسال</span>
                           <ArrowLeft className="w-5 h-5" />
                         </>
                       )}

@@ -2,20 +2,38 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Save, AlertTriangle, X, CheckCircle2, Send } from "lucide-react";
+import {
+  Save,
+  AlertTriangle,
+  X,
+  CheckCircle2,
+  Send,
+  FlaskConical,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { PostStageTestModal } from "@/components/post-stage-test-modal";
 
 type TabType = "pre-stage" | "post-stage";
+type PostStageSubTab = "passed" | "failed";
 
 export default function Stage1SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>("post-stage");
+  const [postStageSubTab, setPostStageSubTab] =
+    useState<PostStageSubTab>("passed");
   const [passedEmailContent, setPassedEmailContent] = useState("");
   const [failedEmailContent, setFailedEmailContent] = useState("");
   const [preStageEmailContent, setPreStageEmailContent] = useState("");
   const [passedEmailSubject, setPassedEmailSubject] = useState("");
   const [failedEmailSubject, setFailedEmailSubject] = useState("");
   const [preStageEmailSubject, setPreStageEmailSubject] = useState("");
+  const [preStageWhatsappTemplate, setPreStageWhatsappTemplate] = useState("");
+  const [preStageWhatsappImage, setPreStageWhatsappImage] = useState("");
+  const [passedWhatsappTemplate, setPassedWhatsappTemplate] = useState("");
+  const [passedWhatsappImage, setPassedWhatsappImage] = useState("");
+  const [failedWhatsappTemplate, setFailedWhatsappTemplate] = useState("");
+  const [failedWhatsappImage, setFailedWhatsappImage] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showTestModal, setShowTestModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState<{
@@ -45,6 +63,12 @@ export default function Stage1SettingsPage() {
         setPassedEmailSubject(data.passed_email_subject || "");
         setFailedEmailSubject(data.failed_email_subject || "");
         setPreStageEmailSubject(data.pre_stage_email_subject || "");
+        setPreStageWhatsappTemplate(data.pre_stage_whatsapp_template || "");
+        setPreStageWhatsappImage(data.pre_stage_whatsapp_image || "");
+        setPassedWhatsappTemplate(data.passed_whatsapp_template || "");
+        setPassedWhatsappImage(data.passed_whatsapp_image || "");
+        setFailedWhatsappTemplate(data.failed_whatsapp_template || "");
+        setFailedWhatsappImage(data.failed_whatsapp_image || "");
       }
     } catch (error) {
       console.error("Error loading settings:", error);
@@ -68,6 +92,10 @@ export default function Stage1SettingsPage() {
             failed_email_content: failedEmailContent,
             passed_email_subject: passedEmailSubject,
             failed_email_subject: failedEmailSubject,
+            passed_whatsapp_template: passedWhatsappTemplate,
+            passed_whatsapp_image: passedWhatsappImage,
+            failed_whatsapp_template: failedWhatsappTemplate,
+            failed_whatsapp_image: failedWhatsappImage,
             updated_at: new Date().toISOString(),
           })
           .eq("stage", 1);
@@ -80,6 +108,10 @@ export default function Stage1SettingsPage() {
           failed_email_content: failedEmailContent,
           passed_email_subject: passedEmailSubject,
           failed_email_subject: failedEmailSubject,
+          passed_whatsapp_template: passedWhatsappTemplate,
+          passed_whatsapp_image: passedWhatsappImage,
+          failed_whatsapp_template: failedWhatsappTemplate,
+          failed_whatsapp_image: failedWhatsappImage,
         });
 
         if (error) throw error;
@@ -111,6 +143,8 @@ export default function Stage1SettingsPage() {
           .update({
             pre_stage_email_content: preStageEmailContent,
             pre_stage_email_subject: preStageEmailSubject,
+            pre_stage_whatsapp_template: preStageWhatsappTemplate,
+            pre_stage_whatsapp_image: preStageWhatsappImage,
             updated_at: new Date().toISOString(),
           })
           .eq("stage", 1);
@@ -121,6 +155,8 @@ export default function Stage1SettingsPage() {
           stage: 1,
           pre_stage_email_content: preStageEmailContent,
           pre_stage_email_subject: preStageEmailSubject,
+          pre_stage_whatsapp_template: preStageWhatsappTemplate,
+          pre_stage_whatsapp_image: preStageWhatsappImage,
         });
 
         if (error) throw error;
@@ -155,10 +191,10 @@ export default function Stage1SettingsPage() {
 
     setSending(true);
     try {
-      // Get all users in this stage
+      // Get all users who submitted forms in this stage
       const { data: submissions, error: fetchError } = await supabase
         .from("form_submissions")
-        .select("user_email")
+        .select("data, user_email")
         .eq("stage", 1);
 
       if (fetchError) throw fetchError;
@@ -170,37 +206,55 @@ export default function Stage1SettingsPage() {
         return;
       }
 
-      // Extract unique emails
-      const emails = [...new Set(submissions.map((s) => s.user_email))];
+      // Create unique recipients list (in case a user submitted multiple times)
+      const uniqueRecipients = Array.from(
+        new Map(
+          submissions.map((s) => {
+            const parsedData =
+              typeof s.data === "string" ? JSON.parse(s.data) : s.data;
+            return [
+              s.user_email,
+              {
+                name: parsedData.fullName || "مستخدم",
+                email: s.user_email,
+                phone: parsedData.phoneNumber || parsedData.phone || null,
+              },
+            ];
+          })
+        ).values()
+      );
 
-      // Send emails via API
-      const response = await fetch("/api/send-email", {
+      // Send both emails and WhatsApp messages via API
+      const response = await fetch("/api/send-stage-messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          to: emails,
-          subject: preStageEmailSubject,
-          content: preStageEmailContent,
-          stage: 1,
+          recipients: uniqueRecipients,
+          emailSubject: preStageEmailSubject,
+          emailContent: preStageEmailContent,
+          whatsappTemplate: preStageWhatsappTemplate,
+          whatsappImage: preStageWhatsappImage,
         }),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to send emails");
+        throw new Error(result.error || "Failed to send messages");
       }
 
       setMessage({
         type: "success",
-        text: `تم إرسال البريد الإلكتروني إلى ${emails.length} مستخدم بنجاح!`,
+        text: `تم الإرسال بنجاح! إيميلات: ${result.emailsSent}، واتساب: ${
+          result.whatsappsSent
+        }${result.errors.length > 0 ? `، أخطاء: ${result.errors.length}` : ""}`,
       });
-      setTimeout(() => setMessage(null), 3000);
+      setTimeout(() => setMessage(null), 5000);
     } catch (error: any) {
-      console.error("Error sending emails:", error);
+      console.error("Error sending messages:", error);
       setMessage({
         type: "error",
-        text: `فشل إرسال البريد الإلكتروني: ${error.message}`,
+        text: `فشل الإرسال: ${error.message}`,
       });
       setTimeout(() => setMessage(null), 3000);
     } finally {
@@ -208,10 +262,51 @@ export default function Stage1SettingsPage() {
     }
   };
 
-  const handleEndStage = () => {
+  const handleEndStage = async () => {
     setShowConfirmModal(false);
-    setMessage({ type: "success", text: "سيتم تفعيل هذه الميزة قريباً" });
-    setTimeout(() => setMessage(null), 3000);
+    setSending(true);
+
+    try {
+      // Send post-stage messages (emails and WhatsApp) to nominated and excluded users
+      const response = await fetch("/api/end-stage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stage: 1,
+          settings: {
+            passedEmailSubject,
+            passedEmailContent,
+            failedEmailSubject,
+            failedEmailContent,
+            passedWhatsappTemplate,
+            passedWhatsappImage,
+            failedWhatsappTemplate,
+            failedWhatsappImage,
+          },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to end stage");
+      }
+
+      setMessage({
+        type: "success",
+        text: `تم إنهاء المرحلة بنجاح! تم الإرسال: إيميلات: ${result.totalEmailsSent}، واتساب: ${result.totalWhatsappsSent}. ناجحين: ${result.nominatedCount}، راسبين: ${result.excludedCount}`,
+      });
+      setTimeout(() => setMessage(null), 10000);
+    } catch (error: any) {
+      console.error("Error ending stage:", error);
+      setMessage({
+        type: "error",
+        text: `فشل إنهاء المرحلة: ${error.message}`,
+      });
+      setTimeout(() => setMessage(null), 5000);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -345,6 +440,49 @@ export default function Stage1SettingsPage() {
               </div>
             </div>
 
+            {/* Pre-Stage WhatsApp Content */}
+            <div className="bg-white rounded-2xl border-2 border-gray-200 p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-2">
+                محتوى رسالة الواتساب للمرحلة
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">
+                هذه الرسالة سيتم إرسالها لجميع المستخدمين في هذه المرحلة عبر
+                الواتساب
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    اسم القالب (Template Name)
+                  </label>
+                  <input
+                    type="text"
+                    value={preStageWhatsappTemplate}
+                    onChange={(e) =>
+                      setPreStageWhatsappTemplate(e.target.value)
+                    }
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all"
+                    placeholder="مثال: pre_stage_1_announcement"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    استخدم {"{{name}}"} في القالب ليتم استبداله باسم المستخدم
+                    تلقائياً
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    رابط الصورة (اختياري)
+                  </label>
+                  <input
+                    type="url"
+                    value={preStageWhatsappImage}
+                    onChange={(e) => setPreStageWhatsappImage(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all"
+                    placeholder="https://example.com/image.jpg"
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Action Buttons */}
             <div className="flex gap-3 justify-end">
               <motion.button
@@ -382,7 +520,7 @@ export default function Stage1SettingsPage() {
                 ) : (
                   <>
                     <Send className="w-5 h-5" />
-                    <span>إرسال إلى جميع المستخدمين</span>
+                    <span>إرسال إيميل وواتساب لجميع المستخدمين</span>
                   </>
                 )}
               </motion.button>
@@ -397,80 +535,260 @@ export default function Stage1SettingsPage() {
             transition={{ duration: 0.2 }}
             className="space-y-6"
           >
-            {/* Passed Users Email */}
-            <div className="bg-white rounded-2xl border-2 border-gray-200 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-2">
-                محتوى البريد الإلكتروني للمتقدمين الناجحين
-              </h2>
-              <p className="text-sm text-gray-600 mb-4">
-                هذا البريد سيتم إرساله للمستخدمين الذين اجتازوا المرحلة بنجاح
-              </p>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    عنوان البريد الإلكتروني
-                  </label>
-                  <input
-                    type="text"
-                    value={passedEmailSubject}
-                    onChange={(e) => setPassedEmailSubject(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all"
-                    placeholder="مثال: مبروك! تم قبولك للمرحلة التالية"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    محتوى البريد الإلكتروني
-                  </label>
-                  <textarea
-                    value={passedEmailContent}
-                    onChange={(e) => setPassedEmailContent(e.target.value)}
-                    rows={8}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all resize-none"
-                    placeholder="اكتب محتوى البريد الإلكتروني هنا..."
-                  />
-                </div>
+            {/* Sub-tabs for Passed/Failed */}
+            <div className="bg-white rounded-2xl border-2 border-gray-200 p-2">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPostStageSubTab("passed")}
+                  className={`
+                    flex-1 px-6 py-3 rounded-xl font-bold transition-all
+                    ${
+                      postStageSubTab === "passed"
+                        ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }
+                  `}
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span>رسائل الناجحين</span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setPostStageSubTab("failed")}
+                  className={`
+                    flex-1 px-6 py-3 rounded-xl font-bold transition-all
+                    ${
+                      postStageSubTab === "failed"
+                        ? "bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }
+                  `}
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <X className="w-5 h-5" />
+                    <span>رسائل غير الناجحين</span>
+                  </div>
+                </button>
               </div>
             </div>
 
-            {/* Failed Users Email */}
-            <div className="bg-white rounded-2xl border-2 border-gray-200 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-2">
-                محتوى البريد الإلكتروني للمتقدمين غير الناجحين
-              </h2>
-              <p className="text-sm text-gray-600 mb-4">
-                هذا البريد سيتم إرساله للمستخدمين الذين لم يجتازوا المرحلة
-              </p>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    عنوان البريد الإلكتروني
-                  </label>
-                  <input
-                    type="text"
-                    value={failedEmailSubject}
-                    onChange={(e) => setFailedEmailSubject(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all"
-                    placeholder="مثال: شكراً لتقديمك على البرنامج"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    محتوى البريد الإلكتروني
-                  </label>
-                  <textarea
-                    value={failedEmailContent}
-                    onChange={(e) => setFailedEmailContent(e.target.value)}
-                    rows={8}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all resize-none"
-                    placeholder="اكتب محتوى البريد الإلكتروني هنا..."
-                  />
-                </div>
-              </div>
-            </div>
+            <AnimatePresence mode="wait">
+              {postStageSubTab === "passed" ? (
+                <motion.div
+                  key="passed"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-6"
+                >
+                  {/* Passed Users Email */}
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl border-2 border-green-300 p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <CheckCircle2 className="w-6 h-6 text-green-600" />
+                      <h2 className="text-xl font-bold text-green-900">
+                        محتوى البريد الإلكتروني للمتقدمين الناجحين
+                      </h2>
+                    </div>
+                    <p className="text-sm text-green-700 mb-4">
+                      هذا البريد سيتم إرساله للمستخدمين الذين اجتازوا المرحلة
+                      بنجاح
+                    </p>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          عنوان البريد الإلكتروني
+                        </label>
+                        <input
+                          type="text"
+                          value={passedEmailSubject}
+                          onChange={(e) =>
+                            setPassedEmailSubject(e.target.value)
+                          }
+                          className="w-full px-4 py-3 border-2 border-green-300 rounded-xl focus:ring-4 focus:ring-green-500/20 focus:border-green-500 transition-all bg-white"
+                          placeholder="مثال: مبروك! تم قبولك للمرحلة التالية"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          محتوى البريد الإلكتروني
+                        </label>
+                        <textarea
+                          value={passedEmailContent}
+                          onChange={(e) =>
+                            setPassedEmailContent(e.target.value)
+                          }
+                          rows={8}
+                          className="w-full px-4 py-3 border-2 border-green-300 rounded-xl focus:ring-4 focus:ring-green-500/20 focus:border-green-500 transition-all resize-none bg-white"
+                          placeholder="اكتب محتوى البريد الإلكتروني هنا..."
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-            {/* Save Button */}
-            <div className="flex justify-end">
+                  {/* Passed Users WhatsApp */}
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl border-2 border-green-300 p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <CheckCircle2 className="w-6 h-6 text-green-600" />
+                      <h2 className="text-xl font-bold text-green-900">
+                        محتوى رسالة الواتساب للمتقدمين الناجحين
+                      </h2>
+                    </div>
+                    <p className="text-sm text-green-700 mb-4">
+                      هذه الرسالة سيتم إرسالها للمستخدمين الذين اجتازوا المرحلة
+                      بنجاح عبر الواتساب
+                    </p>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          اسم القالب (Template Name)
+                        </label>
+                        <input
+                          type="text"
+                          value={passedWhatsappTemplate}
+                          onChange={(e) =>
+                            setPassedWhatsappTemplate(e.target.value)
+                          }
+                          className="w-full px-4 py-3 border-2 border-green-300 rounded-xl focus:ring-4 focus:ring-green-500/20 focus:border-green-500 transition-all bg-white"
+                          placeholder="مثال: stage_1_passed"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          استخدم {"{{name}}"} في القالب ليتم استبداله باسم
+                          المستخدم تلقائياً
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          رابط الصورة (اختياري)
+                        </label>
+                        <input
+                          type="url"
+                          value={passedWhatsappImage}
+                          onChange={(e) =>
+                            setPassedWhatsappImage(e.target.value)
+                          }
+                          className="w-full px-4 py-3 border-2 border-green-300 rounded-xl focus:ring-4 focus:ring-green-500/20 focus:border-green-500 transition-all bg-white"
+                          placeholder="https://example.com/image.jpg"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="failed"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-6"
+                >
+                  {/* Failed Users Email */}
+                  <div className="bg-gradient-to-br from-red-50 to-rose-50 rounded-2xl border-2 border-red-300 p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <X className="w-6 h-6 text-red-600" />
+                      <h2 className="text-xl font-bold text-red-900">
+                        محتوى البريد الإلكتروني للمتقدمين غير الناجحين
+                      </h2>
+                    </div>
+                    <p className="text-sm text-red-700 mb-4">
+                      هذا البريد سيتم إرساله للمستخدمين الذين لم يجتازوا المرحلة
+                    </p>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          عنوان البريد الإلكتروني
+                        </label>
+                        <input
+                          type="text"
+                          value={failedEmailSubject}
+                          onChange={(e) =>
+                            setFailedEmailSubject(e.target.value)
+                          }
+                          className="w-full px-4 py-3 border-2 border-red-300 rounded-xl focus:ring-4 focus:ring-red-500/20 focus:border-red-500 transition-all bg-white"
+                          placeholder="مثال: شكراً لتقديمك على البرنامج"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          محتوى البريد الإلكتروني
+                        </label>
+                        <textarea
+                          value={failedEmailContent}
+                          onChange={(e) =>
+                            setFailedEmailContent(e.target.value)
+                          }
+                          rows={8}
+                          className="w-full px-4 py-3 border-2 border-red-300 rounded-xl focus:ring-4 focus:ring-red-500/20 focus:border-red-500 transition-all resize-none bg-white"
+                          placeholder="اكتب محتوى البريد الإلكتروني هنا..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Failed Users WhatsApp */}
+                  <div className="bg-gradient-to-br from-red-50 to-rose-50 rounded-2xl border-2 border-red-300 p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <X className="w-6 h-6 text-red-600" />
+                      <h2 className="text-xl font-bold text-red-900">
+                        محتوى رسالة الواتساب للمتقدمين غير الناجحين
+                      </h2>
+                    </div>
+                    <p className="text-sm text-red-700 mb-4">
+                      هذه الرسالة سيتم إرسالها للمستخدمين الذين لم يجتازوا
+                      المرحلة عبر الواتساب
+                    </p>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          اسم القالب (Template Name)
+                        </label>
+                        <input
+                          type="text"
+                          value={failedWhatsappTemplate}
+                          onChange={(e) =>
+                            setFailedWhatsappTemplate(e.target.value)
+                          }
+                          className="w-full px-4 py-3 border-2 border-red-300 rounded-xl focus:ring-4 focus:ring-red-500/20 focus:border-red-500 transition-all bg-white"
+                          placeholder="مثال: stage_1_failed"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          استخدم {"{{name}}"} في القالب ليتم استبداله باسم
+                          المستخدم تلقائياً
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          رابط الصورة (اختياري)
+                        </label>
+                        <input
+                          type="url"
+                          value={failedWhatsappImage}
+                          onChange={(e) =>
+                            setFailedWhatsappImage(e.target.value)
+                          }
+                          className="w-full px-4 py-3 border-2 border-red-300 rounded-xl focus:ring-4 focus:ring-red-500/20 focus:border-red-500 transition-all bg-white"
+                          placeholder="https://example.com/image.jpg"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Save and Test Buttons */}
+            <div className="flex gap-3 justify-end">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setShowTestModal(true)}
+                className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all"
+              >
+                <FlaskConical className="w-5 h-5" />
+                <span>اختبار الإرسال</span>
+              </motion.button>
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -614,6 +932,13 @@ export default function Stage1SettingsPage() {
           </>
         )}
       </AnimatePresence>
+
+      {/* Post Stage Test Modal */}
+      <PostStageTestModal
+        isOpen={showTestModal}
+        onClose={() => setShowTestModal(false)}
+        stage={1}
+      />
     </div>
   );
 }

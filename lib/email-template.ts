@@ -3,7 +3,11 @@ import { Resend } from "resend";
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Email template with logo and styling
-export function generateEmailHTML(content: string, subject?: string): string {
+export function generateEmailHTML(
+  content: string,
+  subject?: string,
+  imageUrl?: string
+): string {
   const logoUrl =
     "https://ansjlhmmbkmytgkjpqie.supabase.co/storage/v1/object/public/images/logo.webp";
 
@@ -46,6 +50,13 @@ export function generateEmailHTML(content: string, subject?: string): string {
       line-height: 1.8;
       font-size: 16px;
     }
+    .content-image {
+      max-width: 100%;
+      height: auto;
+      margin-top: 20px;
+      border-radius: 8px;
+      display: block;
+    }
     .email-footer {
       background-color: #f8f8f8;
       padding: 20px 30px;
@@ -67,6 +78,11 @@ export function generateEmailHTML(content: string, subject?: string): string {
     </div>
     <div class="email-body">
       <div class="content">${content}</div>
+      ${
+        imageUrl
+          ? `<img src="${imageUrl}" alt="الصورة" class="content-image" />`
+          : ""
+      }
     </div>
     <div class="email-footer">
       <p>هذا البريد الإلكتروني تم إرساله تلقائياً، يرجى عدم الرد عليه.</p>
@@ -84,9 +100,10 @@ export function generateEmailHTML(content: string, subject?: string): string {
 export async function sendEmail(
   to: string,
   subject: string,
-  content: string
+  content: string,
+  imageUrl?: string
 ): Promise<{ success: boolean; error?: string }> {
-  const htmlContent = generateEmailHTML(content, subject);
+  const htmlContent = generateEmailHTML(content, subject, imageUrl);
 
   try {
     const apiKey = process.env.RESEND_API_KEY;
