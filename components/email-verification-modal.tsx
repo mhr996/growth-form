@@ -27,15 +27,13 @@ export function EmailVerificationModal({
     setLoading(true);
 
     try {
-      // Trim and lowercase the email for consistent comparison
-      const normalizedEmail = email.trim().toLowerCase();
+      // Trim the email
+      const trimmedEmail = email.trim();
 
-      // First, check if the email exists in the invitees table
-      const { data: invitee, error: inviteeError } = await supabase
+      // Check if the email exists in the invitees table - fetch all and check in JS
+      const { data: invitees, error: inviteeError } = await supabase
         .from("invitees")
-        .select("email")
-        .ilike("email", normalizedEmail)
-        .maybeSingle();
+        .select("email");
 
       if (inviteeError) {
         console.error("Invitee check error:", inviteeError);
@@ -44,7 +42,12 @@ export function EmailVerificationModal({
         return;
       }
 
-      if (!invitee) {
+      // Check if the email exists (case-insensitive)
+      const emailExists = invitees?.some(
+        (inv) => inv.email?.toLowerCase().trim() === trimmedEmail.toLowerCase()
+      );
+
+      if (!emailExists) {
         setError("عذراً، هذا البريد الإلكتروني غير مدرج في قائمة المدعوين.");
         setLoading(false);
         return;
@@ -52,7 +55,7 @@ export function EmailVerificationModal({
 
       // If email is in invitees table, send magic link using Supabase Auth
       const { error } = await supabase.auth.signInWithOtp({
-        email: normalizedEmail,
+        email: trimmedEmail,
         options: {
           shouldCreateUser: true,
         },
