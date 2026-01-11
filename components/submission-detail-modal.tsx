@@ -1,7 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X } from "lucide-react";
+import { X, Award, TrendingUp, CheckCircle2, AlertCircle } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 type Submission = {
   id: string;
@@ -27,6 +29,16 @@ type FormField = {
   question_title?: string;
   is_ai_calculated?: boolean;
   display_order?: number;
+  stage?: number;
+  weight?: number;
+};
+
+type StageData = {
+  stage: number;
+  score: number;
+  data: any;
+  ai_evaluations?: any;
+  created_at: string;
 };
 
 interface SubmissionDetailModalProps {
@@ -40,7 +52,58 @@ export function SubmissionDetailModal({
   formFields,
   onClose,
 }: SubmissionDetailModalProps) {
+  const [activeTab, setActiveTab] = useState(1);
+  const [allStageData, setAllStageData] = useState<StageData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
+
+  useEffect(() => {
+    if (submission) {
+      loadAllStageData();
+    }
+  }, [submission]);
+
+  const loadAllStageData = async () => {
+    if (!submission) return;
+
+    setLoading(true);
+    try {
+      // Fetch all submissions for this user
+      const { data, error } = await supabase
+        .from("form_submissions")
+        .select("stage, score, data, ai_evaluations, created_at")
+        .eq("user_email", submission.user_email)
+        .order("stage", { ascending: true });
+
+      if (error) throw error;
+
+      setAllStageData(data || []);
+      // Set active tab to current submission's stage
+      setActiveTab(submission.stage);
+    } catch (error) {
+      console.error("Error loading stage data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!submission) return null;
+
+  const calculateTotalScore = () => {
+    return allStageData.reduce((sum, stage) => sum + (stage.score || 0), 0);
+  };
+
+  const getStageFields = (stage: number) => {
+    return formFields.filter((f) => f.stage === stage);
+  };
+
+  const currentStageData = allStageData.find((s) => s.stage === activeTab) || {
+    stage: activeTab,
+    score: 0,
+    data: {},
+    ai_evaluations: null,
+    created_at: submission.created_at,
+  };
 
   const getFieldLabel = (fieldName: string): string => {
     const field = formFields.find((f) => f.field_name === fieldName);
@@ -258,161 +321,242 @@ export function SubmissionDetailModal({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden"
+            className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] p-6 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold mb-1">تفاصيل النموذج</h2>
-                  <p className="text-white/80 text-sm">
-                    المرحلة {submission.stage}
+            <div className="bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] p-6 text-white flex-shrink-0">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold mb-2 flex items-center gap-3">
+                    <Award className="w-8 h-8" />
+                    تفاصيل المشارك
+                  </h2>
+                  <p className="text-white/90 text-sm mb-3">
+                    {submission.user_email}
                   </p>
+
+                  {/* Total Score Banner */}
+                  <div className="flex items-center gap-4 bg-white/10 backdrop-blur-sm rounded-xl p-4 mt-4">
+                    <div className="flex-1">
+                      <p className="text-white/80 text-xs mb-1">
+                        المجموع الكلي
+                      </p>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-bold text-white">
+                          {calculateTotalScore().toFixed(1)}
+                        </span>
+                        <span className="text-xl text-white/70">/ 30</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[1, 2, 3].map((stage) => {
+                        const stageData = allStageData.find(
+                          (s) => s.stage === stage
+                        );
+                        const stageScore = stageData?.score || 0;
+                        return (
+                          <div
+                            key={stage}
+                            className="text-center bg-white/10 rounded-lg p-2 min-w-[70px]"
+                          >
+                            <p className="text-white/70 text-xs mb-1">
+                              المرحلة {stage}
+                            </p>
+                            <p className="text-lg font-bold text-white">
+                              {stageScore.toFixed(1)}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
                 <button
                   onClick={onClose}
-                  className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+                  className="p-2 hover:bg-white/10 rounded-xl transition-colors flex-shrink-0"
                 >
                   <X className="w-6 h-6" />
                 </button>
               </div>
             </div>
 
-            {/* Modal Content */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-              <div className="space-y-6">
-                {/* User Info */}
-                <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-semibold text-gray-700">
-                      المستخدم:
-                    </span>
-                    <span className="text-gray-900">
-                      {submission.user_email}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-semibold text-gray-700">النقاط:</span>
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-amber-100 text-amber-700">
-                      {submission.score?.toFixed(1) || "0.0"}
-                    </span>
-                  </div>
-                  {submission.channel && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-semibold text-gray-700">
-                        القناة:
-                      </span>
-                      <span className="text-gray-900">
-                        {submission.channel}
-                      </span>
-                    </div>
-                  )}
-                  {submission.note && (
-                    <div className="flex flex-col text-sm">
-                      <span className="font-semibold text-gray-700 mb-1">
-                        ملاحظات:
-                      </span>
-                      <span className="text-gray-900 bg-white p-2 rounded">
-                        {submission.note}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-semibold text-gray-700">
-                      تاريخ التقديم:
-                    </span>
-                    <span className="text-gray-900">
-                      {new Date(submission.created_at).toLocaleString("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
+            {/* Stage Tabs */}
+            <div className="bg-gray-50 border-b border-gray-200 flex-shrink-0">
+              <div className="flex items-center gap-2 px-6 py-3">
+                {[1, 2, 3].map((stage) => {
+                  const stageData = allStageData.find((s) => s.stage === stage);
+                  const hasData = !!stageData;
+                  const isActive = activeTab === stage;
+
+                  return (
+                    <button
+                      key={stage}
+                      onClick={() => setActiveTab(stage)}
+                      disabled={!hasData}
+                      className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${
+                        isActive
+                          ? "bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] text-white shadow-lg"
+                          : hasData
+                          ? "bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-200"
+                          : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      }`}
+                    >
+                      <span>المرحلة {stage}</span>
+                      {hasData && (
+                        <CheckCircle2
+                          className={`w-4 h-4 ${
+                            isActive ? "text-white" : "text-green-500"
+                          }`}
+                        />
+                      )}
+                      {!hasData && <AlertCircle className="w-4 h-4" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {loading ? (
+                <div className="flex items-center justify-center py-20">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#2A3984] border-t-transparent mx-auto mb-4"></div>
+                    <p className="text-gray-600">جاري التحميل...</p>
                   </div>
                 </div>
-
-                {/* Form Data with Scores */}
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-4">
-                    البيانات المقدمة
-                  </h3>
-                  <div className="space-y-3">
-                    {Object.entries(submission.data || {})
-                      .sort(([fieldNameA], [fieldNameB]) => {
-                        const fieldA = formFields.find(
-                          (f) => f.field_name === fieldNameA
-                        );
-                        const fieldB = formFields.find(
-                          (f) => f.field_name === fieldNameB
-                        );
-                        return (
-                          (fieldA?.display_order || 999) -
-                          (fieldB?.display_order || 999)
-                        );
-                      })
-                      .map(([fieldName, value]) => {
-                        const field = formFields.find(
-                          (f) => f.field_name === fieldName
-                        );
-                        const hasWeight = field?.has_weight;
-                        const selectedOption = field?.options?.options?.find(
-                          (opt: any) => opt.value === value
-                        );
-                        const fieldScore = selectedOption?.weight || 0;
-
-                        // Get AI evaluation for this field
-                        const aiEvaluation =
-                          field?.question_title && submission.ai_evaluations
-                            ? submission.ai_evaluations[field.question_title]
-                            : null;
-
-                        return (
-                          <div
-                            key={fieldName}
-                            className={`${
-                              hasWeight || field?.is_ai_calculated
-                                ? "bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200"
-                                : "bg-white border-2 border-gray-200"
-                            } rounded-xl p-4`}
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="text-sm font-bold text-gray-800">
-                                {getFieldLabel(fieldName)}
-                              </div>
-                              {hasWeight && (
-                                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-amber-500 text-white">
-                                  {fieldScore} / 1000
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-gray-900">
-                              {renderValue(value, field)}
-                            </div>
-
-                            {/* AI Evaluation Display */}
-                            {renderAIEvaluation(aiEvaluation)}
-                          </div>
-                        );
-                      })}
-
-                    {/* Total Score */}
-                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-5 mt-4">
-                      <div className="flex items-center justify-between">
-                        <div className="text-lg font-bold text-gray-900">
-                          المجموع الكلي
+              ) : (
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeTab}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="space-y-6"
+                  >
+                    {/* Stage Info */}
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-900 mb-1">
+                            المرحلة {currentStageData.stage}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            تاريخ التقديم:{" "}
+                            {new Date(
+                              currentStageData.created_at
+                            ).toLocaleDateString("ar-SA", {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            })}
+                          </p>
                         </div>
-                        <span className="inline-flex items-center px-5 py-2 rounded-full text-xl font-bold bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg">
-                          {submission.score?.toFixed(1) || "0.0"} /{" "}
-                          {formFields.filter((f) => f.has_weight).length * 1000}
-                        </span>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-600 mb-1">النقاط</p>
+                          <div className="flex items-center gap-2">
+                            <TrendingUp className="w-5 h-5 text-blue-600" />
+                            <span className="text-3xl font-bold text-[#2A3984]">
+                              {currentStageData.score?.toFixed(1) || "0.0"}
+                            </span>
+                            <span className="text-lg text-gray-500">/ 10</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              </div>
+
+                    {/* Fields & Answers */}
+                    <div className="space-y-4">
+                      <h4 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                        <span className="w-1 h-6 bg-gradient-to-b from-[#2A3984] to-[#3a4a9f] rounded-full"></span>
+                        الإجابات المقدمة
+                      </h4>
+
+                      {Object.entries(currentStageData.data || {})
+                        .sort(([fieldNameA], [fieldNameB]) => {
+                          const fieldA = getStageFields(activeTab).find(
+                            (f) => f.field_name === fieldNameA
+                          );
+                          const fieldB = getStageFields(activeTab).find(
+                            (f) => f.field_name === fieldNameB
+                          );
+                          return (
+                            (fieldA?.display_order || 999) -
+                            (fieldB?.display_order || 999)
+                          );
+                        })
+                        .map(([fieldName, value]) => {
+                          const field = getStageFields(activeTab).find(
+                            (f) => f.field_name === fieldName
+                          );
+                          if (!field) return null;
+
+                          const hasWeight = field.has_weight;
+                          const isAI = field.is_ai_calculated;
+                          const selectedOption = field.options?.options?.find(
+                            (opt: any) => opt.value === value
+                          );
+                          const fieldScore = selectedOption?.weight || 0;
+
+                          // Get AI evaluation
+                          const aiEvaluation =
+                            field.question_title &&
+                            currentStageData.ai_evaluations
+                              ? currentStageData.ai_evaluations[
+                                  field.question_title
+                                ]
+                              : null;
+
+                          return (
+                            <div
+                              key={fieldName}
+                              className={`rounded-2xl p-5 border-2 ${
+                                isAI
+                                  ? "bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200"
+                                  : hasWeight
+                                  ? "bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200"
+                                  : "bg-white border-gray-200"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex-1">
+                                  <h5 className="font-bold text-gray-900 mb-1">
+                                    {field.label}
+                                  </h5>
+                                  {field.question_title && (
+                                    <p className="text-sm text-gray-600">
+                                      {field.question_title}
+                                    </p>
+                                  )}
+                                </div>
+                                {hasWeight && !isAI && (
+                                  <span className="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md">
+                                    {fieldScore} نقطة
+                                  </span>
+                                )}
+                                {isAI && (
+                                  <span className="inline-flex items-center gap-1 px-4 py-2 rounded-xl text-sm font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md">
+                                    <Award className="w-4 h-4" />
+                                    AI تقييم
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 mb-3">
+                                <p className="text-gray-900 leading-relaxed whitespace-pre-wrap">
+                                  {renderValue(value, field)}
+                                </p>
+                              </div>
+
+                              {renderAIEvaluation(aiEvaluation)}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
+              )}
             </div>
           </motion.div>
         </div>
