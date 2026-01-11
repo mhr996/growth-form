@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
           user_name: string;
           user_email: string;
           user_phone: string | null;
+          user_gender?: string | null;
           filtering_decision: string;
         }>;
         channels?: string[];
@@ -92,7 +93,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Parse submissions and extract names and phones from data JSON
+      // Parse submissions and extract names, phones, and gender from data JSON
       parsedSubmissions = submissions.map((s) => {
         const parsedData =
           typeof s.data === "string" ? JSON.parse(s.data) : s.data;
@@ -100,6 +101,7 @@ export async function POST(req: NextRequest) {
           user_name: parsedData.fullName || "مستخدم",
           user_email: s.user_email,
           user_phone: parsedData.phoneNumber || parsedData.phone || null,
+          user_gender: parsedData.gender || null,
           filtering_decision: s.filtering_decision,
         };
       });
@@ -191,6 +193,13 @@ export async function POST(req: NextRequest) {
                 formattedPhone = "966" + formattedPhone;
               }
 
+              // Modify template based on gender
+              let finalTemplate = whatsappTemplate;
+              if (user.user_gender) {
+                const genderSuffix = user.user_gender === "male" ? "_m" : "_f";
+                finalTemplate = whatsappTemplate + genderSuffix;
+              }
+
               const whatsappUrl = new URL(process.env.WHATSAPP_API);
               whatsappUrl.searchParams.append(
                 "token",
@@ -201,7 +210,7 @@ export async function POST(req: NextRequest) {
                 process.env.WHATSAPP_SENDER_ID
               );
               whatsappUrl.searchParams.append("phone", formattedPhone);
-              whatsappUrl.searchParams.append("template", whatsappTemplate);
+              whatsappUrl.searchParams.append("template", finalTemplate);
               whatsappUrl.searchParams.append("param_1", user.user_name);
 
               if (whatsappImage) {

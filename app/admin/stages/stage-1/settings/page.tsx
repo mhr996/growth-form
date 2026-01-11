@@ -307,6 +307,7 @@ export default function Stage1SettingsPage() {
                 name: parsedData.fullName || "مستخدم",
                 email: s.user_email,
                 phone: parsedData.phoneNumber || parsedData.phone || null,
+                gender: parsedData.gender || null,
               },
             ];
           })

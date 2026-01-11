@@ -6,6 +6,7 @@ interface Recipient {
   name: string;
   email: string;
   phone: string | null;
+  gender?: string | null;
 }
 
 export async function POST(req: NextRequest) {
@@ -117,6 +118,13 @@ export async function POST(req: NextRequest) {
               formattedPhone = "966" + formattedPhone;
             }
 
+            // Modify template based on gender
+            let finalTemplate = whatsappTemplate;
+            if (recipient.gender) {
+              const genderSuffix = recipient.gender === "male" ? "_m" : "_f";
+              finalTemplate = whatsappTemplate + genderSuffix;
+            }
+
             const whatsappUrl = new URL(process.env.WHATSAPP_API);
             whatsappUrl.searchParams.append(
               "token",
@@ -127,7 +135,7 @@ export async function POST(req: NextRequest) {
               process.env.WHATSAPP_SENDER_ID
             );
             whatsappUrl.searchParams.append("phone", formattedPhone);
-            whatsappUrl.searchParams.append("template", whatsappTemplate);
+            whatsappUrl.searchParams.append("template", finalTemplate);
             whatsappUrl.searchParams.append("param_1", recipient.name);
 
             if (whatsappImage) {
