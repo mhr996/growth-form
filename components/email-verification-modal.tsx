@@ -27,7 +27,20 @@ export function EmailVerificationModal({
     setLoading(true);
 
     try {
-      // Send magic link using Supabase Auth
+      // First, check if the email exists in the invitees table
+      const { data: invitee, error: inviteeError } = await supabase
+        .from("invitees")
+        .select("email")
+        .eq("email", email)
+        .single();
+
+      if (inviteeError || !invitee) {
+        setError("عذراً، هذا البريد الإلكتروني غير مدرج في قائمة المدعوين.");
+        setLoading(false);
+        return;
+      }
+
+      // If email is in invitees table, send magic link using Supabase Auth
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {

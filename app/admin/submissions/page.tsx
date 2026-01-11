@@ -51,6 +51,8 @@ type Submission = {
   score?: number;
   ai_evaluations?: any;
   filtering_decision?: "auto" | "exclude" | "nominated";
+  channel?: string | null;
+  note?: string | null;
 };
 
 type FormField = {
@@ -763,6 +765,9 @@ export default function SubmissionsPage() {
                   <th className="px-6 py-4 text-right text-sm font-bold">
                     الجنس
                   </th>
+                  <th className="px-6 py-4 text-right text-sm font-bold">
+                    القناة
+                  </th>
                   <th
                     className="px-6 py-4 text-right text-sm font-bold cursor-pointer hover:bg-white/10 transition-colors"
                     onClick={() => handleSort("age")}
@@ -851,6 +856,9 @@ export default function SubmissionsPage() {
                         : submission.data?.gender === "female"
                         ? "أنثى"
                         : "-"}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {submission.channel || "-"}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {submission.data?.age || "-"}

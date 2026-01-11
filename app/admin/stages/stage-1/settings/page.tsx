@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Send,
   FlaskConical,
+  Loader2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PostStageTestModal } from "@/components/post-stage-test-modal";
@@ -40,11 +41,86 @@ export default function Stage1SettingsPage() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [channelCounts, setChannelCounts] = useState<Record<string, number>>(
+    {}
+  );
+  const [preStageSelectedChannels, setPreStageSelectedChannels] = useState<
+    string[]
+  >([]);
+  const [postStageSelectedChannels, setPostStageSelectedChannels] = useState<
+    string[]
+  >([]);
+  const [sendingProgress, setSendingProgress] = useState({
+    current: 0,
+    total: 0,
+    emailsSent: 0,
+    whatsappsSent: 0,
+    errors: [] as string[],
+  });
+  const [showProgressModal, setShowProgressModal] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
     loadSettings();
+    fetchChannelCounts();
   }, []);
+
+  const fetchChannelCounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("form_submissions")
+        .select("channel")
+        .eq("stage", 1)
+        .not("channel", "is", null);
+
+      if (error) throw error;
+
+      // Count submissions per channel
+      const counts: Record<string, number> = {};
+      data.forEach((s) => {
+        if (s.channel) {
+          counts[s.channel] = (counts[s.channel] || 0) + 1;
+        }
+      });
+      setChannelCounts(counts);
+    } catch (error) {
+      console.error("Error fetching channels:", error);
+    }
+  };
+
+  const togglePreStageChannel = (channel: string) => {
+    setPreStageSelectedChannels((prev) =>
+      prev.includes(channel)
+        ? prev.filter((c) => c !== channel)
+        : [...prev, channel]
+    );
+  };
+
+  const toggleAllPreStageChannels = () => {
+    const allChannels = Object.keys(channelCounts);
+    if (preStageSelectedChannels.length === allChannels.length) {
+      setPreStageSelectedChannels([]);
+    } else {
+      setPreStageSelectedChannels([...allChannels]);
+    }
+  };
+
+  const togglePostStageChannel = (channel: string) => {
+    setPostStageSelectedChannels((prev) =>
+      prev.includes(channel)
+        ? prev.filter((c) => c !== channel)
+        : [...prev, channel]
+    );
+  };
+
+  const toggleAllPostStageChannels = () => {
+    const allChannels = Object.keys(channelCounts);
+    if (postStageSelectedChannels.length === allChannels.length) {
+      setPostStageSelectedChannels([]);
+    } else {
+      setPostStageSelectedChannels([...allChannels]);
+    }
+  };
 
   const loadSettings = async () => {
     try {
@@ -190,19 +266,32 @@ export default function Stage1SettingsPage() {
     }
 
     setSending(true);
+    setShowProgressModal(true);
+
     try {
-      // Get all users who submitted forms in this stage
-      const { data: submissions, error: fetchError } = await supabase
+      // Build query with channel filter
+      let query = supabase
         .from("form_submissions")
-        .select("data, user_email")
+        .select("data, user_email, channel")
         .eq("stage", 1);
+
+      // Apply channel filter if channels are selected
+      if (preStageSelectedChannels.length > 0) {
+        query = query.in("channel", preStageSelectedChannels);
+      }
+
+      const { data: submissions, error: fetchError } = await query;
 
       if (fetchError) throw fetchError;
 
       if (!submissions || submissions.length === 0) {
-        setMessage({ type: "error", text: "لا يوجد مستخدمين في هذه المرحلة" });
+        setMessage({
+          type: "error",
+          text: "لا يوجد مستخدمين في هذه المرحلة أو القناة المحددة",
+        });
         setTimeout(() => setMessage(null), 3000);
         setSending(false);
+        setShowProgressModal(false);
         return;
       }
 
@@ -224,6 +313,15 @@ export default function Stage1SettingsPage() {
         ).values()
       );
 
+      // Initialize progress
+      setSendingProgress({
+        current: 0,
+        total: uniqueRecipients.length,
+        emailsSent: 0,
+        whatsappsSent: 0,
+        errors: [],
+      });
+
       // Send both emails and WhatsApp messages via API
       const response = await fetch("/api/send-stage-messages", {
         method: "POST",
@@ -242,6 +340,15 @@ export default function Stage1SettingsPage() {
       if (!response.ok) {
         throw new Error(result.error || "Failed to send messages");
       }
+
+      // Update progress with results
+      setSendingProgress({
+        current: uniqueRecipients.length,
+        total: uniqueRecipients.length,
+        emailsSent: result.emailsSent || 0,
+        whatsappsSent: result.whatsappsSent || 0,
+        errors: result.errors || [],
+      });
 
       setMessage({
         type: "success",
@@ -265,14 +372,42 @@ export default function Stage1SettingsPage() {
   const handleEndStage = async () => {
     setShowConfirmModal(false);
     setSending(true);
+    setShowProgressModal(true);
 
     try {
+      // Build query to count recipients with channel filter
+      let query = supabase
+        .from("form_submissions")
+        .select("user_email, channel", { count: "exact" })
+        .eq("stage", 1);
+
+      // Apply channel filter if channels are selected
+      if (postStageSelectedChannels.length > 0) {
+        query = query.in("channel", postStageSelectedChannels);
+      }
+
+      const { count } = await query;
+      const totalRecipients = count || 0;
+
+      // Initialize progress
+      setSendingProgress({
+        current: 0,
+        total: totalRecipients,
+        emailsSent: 0,
+        whatsappsSent: 0,
+        errors: [],
+      });
+
       // Send post-stage messages (emails and WhatsApp) to nominated and excluded users
       const response = await fetch("/api/end-stage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           stage: 1,
+          channels:
+            postStageSelectedChannels.length > 0
+              ? postStageSelectedChannels
+              : undefined,
           settings: {
             passedEmailSubject,
             passedEmailContent,
@@ -291,6 +426,15 @@ export default function Stage1SettingsPage() {
       if (!response.ok) {
         throw new Error(result.error || "Failed to end stage");
       }
+
+      // Update progress with results
+      setSendingProgress({
+        current: totalRecipients,
+        total: totalRecipients,
+        emailsSent: result.totalEmailsSent || 0,
+        whatsappsSent: result.totalWhatsappsSent || 0,
+        errors: result.errors || [],
+      });
 
       setMessage({
         type: "success",
@@ -404,6 +548,81 @@ export default function Stage1SettingsPage() {
             transition={{ duration: 0.2 }}
             className="space-y-6"
           >
+            {/* Channel Filter - Pre Stage */}
+            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl border-2 border-purple-300 p-6">
+              <h2 className="text-xl font-bold text-purple-900 mb-2">
+                تصفية حسب القناة
+              </h2>
+              <p className="text-sm text-purple-700 mb-4">
+                اختر القنوات التي تريد إرسال الرسائل لها (سيؤثر على الإيميل
+                والواتساب)
+              </p>
+              {Object.keys(channelCounts).length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="pre-all-channels"
+                      checked={
+                        preStageSelectedChannels.length ===
+                        Object.keys(channelCounts).length
+                      }
+                      onChange={toggleAllPreStageChannels}
+                      className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-2 focus:ring-purple-600"
+                    />
+                    <label
+                      htmlFor="pre-all-channels"
+                      className="text-sm font-bold text-gray-900 cursor-pointer"
+                    >
+                      جميع القنوات (
+                      {Object.values(channelCounts).reduce((a, b) => a + b, 0)}{" "}
+                      مستخدم)
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {Object.entries(channelCounts)
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([channel, count]) => (
+                        <div
+                          key={channel}
+                          className="flex items-center gap-2 bg-white p-3 rounded-lg border border-purple-200"
+                        >
+                          <input
+                            type="checkbox"
+                            id={`pre-channel-${channel}`}
+                            checked={preStageSelectedChannels.includes(channel)}
+                            onChange={() => togglePreStageChannel(channel)}
+                            className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-2 focus:ring-purple-600"
+                          />
+                          <label
+                            htmlFor={`pre-channel-${channel}`}
+                            className="text-sm font-medium text-gray-700 cursor-pointer flex-1"
+                          >
+                            {channel}{" "}
+                            <span className="text-purple-600 font-bold">
+                              ({count})
+                            </span>
+                          </label>
+                        </div>
+                      ))}
+                  </div>
+                  {preStageSelectedChannels.length > 0 && (
+                    <p className="text-xs text-purple-700 bg-purple-100 p-2 rounded">
+                      تم اختيار {preStageSelectedChannels.length} من{" "}
+                      {Object.keys(channelCounts).length} قناة (
+                      {preStageSelectedChannels.reduce(
+                        (sum, ch) => sum + (channelCounts[ch] || 0),
+                        0
+                      )}{" "}
+                      مستخدم)
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">لا توجد قنوات متاحة</p>
+              )}
+            </div>
+
             {/* Pre-Stage Email Content */}
             <div className="bg-white rounded-2xl border-2 border-gray-200 p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-2">
@@ -535,6 +754,83 @@ export default function Stage1SettingsPage() {
             transition={{ duration: 0.2 }}
             className="space-y-6"
           >
+            {/* Channel Filter - Post Stage */}
+            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl border-2 border-purple-300 p-6">
+              <h2 className="text-xl font-bold text-purple-900 mb-2">
+                تصفية حسب القناة
+              </h2>
+              <p className="text-sm text-purple-700 mb-4">
+                اختر القنوات التي تريد إرسال الرسائل لها (سيؤثر على رسائل
+                الناجحين وغير الناجحين)
+              </p>
+              {Object.keys(channelCounts).length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="post-all-channels"
+                      checked={
+                        postStageSelectedChannels.length ===
+                        Object.keys(channelCounts).length
+                      }
+                      onChange={toggleAllPostStageChannels}
+                      className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-2 focus:ring-purple-600"
+                    />
+                    <label
+                      htmlFor="post-all-channels"
+                      className="text-sm font-bold text-gray-900 cursor-pointer"
+                    >
+                      جميع القنوات (
+                      {Object.values(channelCounts).reduce((a, b) => a + b, 0)}{" "}
+                      مستخدم)
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {Object.entries(channelCounts)
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([channel, count]) => (
+                        <div
+                          key={channel}
+                          className="flex items-center gap-2 bg-white p-3 rounded-lg border border-purple-200"
+                        >
+                          <input
+                            type="checkbox"
+                            id={`post-channel-${channel}`}
+                            checked={postStageSelectedChannels.includes(
+                              channel
+                            )}
+                            onChange={() => togglePostStageChannel(channel)}
+                            className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-2 focus:ring-purple-600"
+                          />
+                          <label
+                            htmlFor={`post-channel-${channel}`}
+                            className="text-sm font-medium text-gray-700 cursor-pointer flex-1"
+                          >
+                            {channel}{" "}
+                            <span className="text-purple-600 font-bold">
+                              ({count})
+                            </span>
+                          </label>
+                        </div>
+                      ))}
+                  </div>
+                  {postStageSelectedChannels.length > 0 && (
+                    <p className="text-xs text-purple-700 bg-purple-100 p-2 rounded">
+                      تم اختيار {postStageSelectedChannels.length} من{" "}
+                      {Object.keys(channelCounts).length} قناة (
+                      {postStageSelectedChannels.reduce(
+                        (sum, ch) => sum + (channelCounts[ch] || 0),
+                        0
+                      )}{" "}
+                      مستخدم)
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">لا توجد قنوات متاحة</p>
+              )}
+            </div>
+
             {/* Sub-tabs for Passed/Failed */}
             <div className="bg-white rounded-2xl border-2 border-gray-200 p-2">
               <div className="flex gap-2">
@@ -939,6 +1235,114 @@ export default function Stage1SettingsPage() {
         onClose={() => setShowTestModal(false)}
         stage={1}
       />
+
+      {/* Progress Modal */}
+      <AnimatePresence>
+        {showProgressModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">
+                  جاري إرسال الرسائل
+                </h2>
+                <button
+                  onClick={() => setShowProgressModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  disabled={sending}
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Progress Bar */}
+                <div>
+                  <div className="flex justify-between text-sm text-gray-600 mb-2">
+                    <span>التقدم</span>
+                    <span>
+                      {sendingProgress.current} / {sendingProgress.total}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{
+                        width: `${
+                          sendingProgress.total > 0
+                            ? (sendingProgress.current /
+                                sendingProgress.total) *
+                              100
+                            : 0
+                        }%`,
+                      }}
+                      transition={{ duration: 0.3 }}
+                      className="h-full bg-gradient-to-r from-[#2A3984] to-[#3a4a9f]"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2 text-center">
+                    {sendingProgress.current === sendingProgress.total &&
+                    sendingProgress.total > 0
+                      ? "اكتمل الإرسال!"
+                      : "يرجى الانتظار، قد يستغرق هذا عدة دقائق..."}
+                  </p>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-blue-50 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {sendingProgress.emailsSent}
+                    </div>
+                    <div className="text-sm text-gray-600">إيميلات</div>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-green-600">
+                      {sendingProgress.whatsappsSent}
+                    </div>
+                    <div className="text-sm text-gray-600">واتساب</div>
+                  </div>
+                </div>
+
+                {/* Errors */}
+                {sendingProgress.errors.length > 0 && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="text-sm font-semibold text-red-800 mb-2">
+                      أخطاء ({sendingProgress.errors.length}):
+                    </div>
+                    <div className="max-h-32 overflow-y-auto text-xs text-red-700 space-y-1">
+                      {sendingProgress.errors.slice(0, 5).map((err, idx) => (
+                        <div key={idx}>• {err}</div>
+                      ))}
+                      {sendingProgress.errors.length > 5 && (
+                        <div className="text-red-600 font-semibold mt-2">
+                          ... و {sendingProgress.errors.length - 5} أخطاء أخرى
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Loading Animation */}
+                {sending && (
+                  <div className="flex justify-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-[#2A3984]" />
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

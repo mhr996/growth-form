@@ -281,6 +281,13 @@ export default function Home() {
     const supabase = createClient();
 
     try {
+      // Fetch invitee data to get channel and note
+      const { data: invitee } = await supabase
+        .from("invitees")
+        .select("channel, note")
+        .eq("email", user?.email)
+        .single();
+
       // Calculate score based on weighted fields
       let totalScore = 0;
       formFields.forEach((field) => {
@@ -307,6 +314,8 @@ export default function Home() {
             stage: currentStep,
             data: formValues,
             score: totalScore,
+            channel: invitee?.channel || null,
+            note: invitee?.note || null,
           },
         ])
         .select()
@@ -796,7 +805,7 @@ export default function Home() {
                       {/* Submit Button */}
                       <motion.button
                         type="submit"
-                        disabled={true}
+                        disabled={isFormLocked}
                         whileHover={{ scale: isFormLocked ? 1 : 1.02 }}
                         whileTap={{ scale: isFormLocked ? 1 : 0.98 }}
                         className={`w-full mt-8 px-8 py-5 rounded-xl font-bold text-lg shadow-xl transition-all duration-300 flex items-center justify-center gap-3 ${

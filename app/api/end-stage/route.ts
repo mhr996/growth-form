@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { stage, settings, testMode, testRecipients } =
+    const { stage, settings, testMode, testRecipients, channels } =
       (await req.json()) as {
         stage: number;
         settings: PostStageSettings;
@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
           user_phone: string | null;
           filtering_decision: string;
         }>;
+        channels?: string[];
       };
 
     if (!stage || !settings) {
@@ -67,11 +68,18 @@ export async function POST(req: NextRequest) {
     if (testMode && testRecipients && testRecipients.length > 0) {
       parsedSubmissions = testRecipients;
     } else {
-      // Get all submissions for this stage with filtering_decision
-      const { data: submissions, error: fetchError } = await supabase
+      // Build query with optional channel filter
+      let query = supabase
         .from("form_submissions")
-        .select("data, user_email, filtering_decision")
+        .select("data, user_email, filtering_decision, channel")
         .eq("stage", stage);
+
+      // Apply channel filter if channels are provided
+      if (channels && channels.length > 0) {
+        query = query.in("channel", channels);
+      }
+
+      const { data: submissions, error: fetchError } = await query;
 
       if (fetchError) {
         throw new Error(`Failed to fetch submissions: ${fetchError.message}`);

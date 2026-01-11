@@ -13,6 +13,8 @@ type Submission = {
   score?: number;
   ai_evaluations?: any;
   filtering_decision?: "auto" | "exclude" | "nominated";
+  channel?: string | null;
+  note?: string | null;
 };
 
 type FormField = {
@@ -296,6 +298,26 @@ export function SubmissionDetailModal({
                       {submission.score?.toFixed(1) || "0.0"}
                     </span>
                   </div>
+                  {submission.channel && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-semibold text-gray-700">
+                        القناة:
+                      </span>
+                      <span className="text-gray-900">
+                        {submission.channel}
+                      </span>
+                    </div>
+                  )}
+                  {submission.note && (
+                    <div className="flex flex-col text-sm">
+                      <span className="font-semibold text-gray-700 mb-1">
+                        ملاحظات:
+                      </span>
+                      <span className="text-gray-900 bg-white p-2 rounded">
+                        {submission.note}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-semibold text-gray-700">
                       تاريخ التقديم:
