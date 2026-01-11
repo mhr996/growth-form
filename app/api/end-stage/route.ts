@@ -277,6 +277,26 @@ export async function POST(req: NextRequest) {
       totalWhatsappsSent += result.whatsappsSent;
     }
 
+    // Move nominated users to the next stage (if not in test mode)
+    if (!testMode && nominatedUsers.length > 0 && stage < 3) {
+      const nextStage = stage + 1;
+      const nominatedEmails = nominatedUsers.map((u) => u.user_email);
+
+      const { error: updateError } = await supabase
+        .from("form_submissions")
+        .update({ stage: nextStage })
+        .eq("stage", stage)
+        .eq("filtering_decision", "nominated")
+        .in("user_email", nominatedEmails);
+
+      if (updateError) {
+        console.error("Error moving users to next stage:", updateError);
+        allErrors.push(
+          `Failed to move users to stage ${nextStage}: ${updateError.message}`
+        );
+      }
+    }
+
     return NextResponse.json({
       success: true,
       totalEmailsSent,
@@ -287,6 +307,7 @@ export async function POST(req: NextRequest) {
         (s) => s.filtering_decision === "auto"
       ).length,
       errors: allErrors,
+      movedToNextStage: !testMode && stage < 3 ? nominatedUsers.length : 0,
     });
   } catch (error: any) {
     console.error("Error in end-stage API:", error);
