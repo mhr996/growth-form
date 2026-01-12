@@ -68,20 +68,97 @@ export function SubmissionDetailModal({
 
     setLoading(true);
     try {
-      // Fetch all submissions for this user
-      const { data, error } = await supabase
-        .from("form_submissions")
-        .select("stage, score, data, ai_evaluations, created_at")
-        .eq("user_email", submission.user_email)
-        .order("stage", { ascending: true });
+      // Since there's only one submission per user with all stage data combined,
+      // we need to separate the data by stage based on field names
+      const stageDataMap: Record<number, StageData> = {};
 
-      if (error) throw error;
+      // Group fields by stage
+      const fieldsByStage: Record<number, FormField[]> = {
+        1: formFields.filter((f) => f.stage === 1),
+        2: formFields.filter((f) => f.stage === 2),
+        3: formFields.filter((f) => f.stage === 3),
+      };
 
-      setAllStageData(data || []);
+      // Separate submission data by stage
+      [1, 2, 3].forEach((stageNum) => {
+        const stageFields = fieldsByStage[stageNum];
+        const stageData: any = {};
+        let hasData = false;
+
+        stageFields.forEach((field) => {
+          if (
+            submission.data &&
+            submission.data[field.field_name] !== undefined
+          ) {
+            stageData[field.field_name] = submission.data[field.field_name];
+            hasData = true;
+          }
+        });
+
+        if (hasData) {
+          // Calculate stage score (sum of weighted fields for this stage)
+          let stageScore = 0;
+          stageFields.forEach((field) => {
+            if (field.has_weight && stageData[field.field_name] !== undefined) {
+              const selectedOption = field.options?.options?.find(
+                (opt: any) => opt.value === stageData[field.field_name]
+              );
+              if (selectedOption?.weight) {
+                stageScore += selectedOption.weight;
+              }
+            }
+            // Add AI evaluation scores
+            if (
+              field.is_ai_calculated &&
+              field.question_title &&
+              submission.ai_evaluations?.[field.question_title]
+            ) {
+              const aiEval = submission.ai_evaluations[field.question_title];
+              if (aiEval?.evaluation) {
+                // Try to extract score from AI evaluation
+                const evaluation = aiEval.evaluation;
+                if (
+                  typeof evaluation === "object" &&
+                  !Array.isArray(evaluation)
+                ) {
+                  // Sum up all criterion results
+                  const breakdownEntries = Object.entries(evaluation).filter(
+                    ([key]) => !["error", "total"].includes(key)
+                  );
+                  const aiScore = breakdownEntries.reduce(
+                    (sum, [_, data]: [string, any]) => {
+                      if (
+                        typeof data === "object" &&
+                        data !== null &&
+                        typeof data.result === "number"
+                      ) {
+                        return sum + data.result;
+                      }
+                      return sum;
+                    },
+                    0
+                  );
+                  stageScore += aiScore;
+                }
+              }
+            }
+          });
+
+          stageDataMap[stageNum] = {
+            stage: stageNum,
+            score: stageScore,
+            data: stageData,
+            ai_evaluations: submission.ai_evaluations,
+            created_at: submission.created_at,
+          };
+        }
+      });
+
+      setAllStageData(Object.values(stageDataMap));
       // Set active tab to current submission's stage
       setActiveTab(submission.stage);
     } catch (error) {
-      console.error("Error loading stage data:", error);
+      console.error("Error processing stage data:", error);
     } finally {
       setLoading(false);
     }
@@ -346,7 +423,6 @@ export function SubmissionDetailModal({
                         <span className="text-4xl font-bold text-white">
                           {calculateTotalScore().toFixed(1)}
                         </span>
-                        <span className="text-xl text-white/70">/ 30</span>
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-3">
@@ -460,7 +536,6 @@ export function SubmissionDetailModal({
                             <span className="text-3xl font-bold text-[#2A3984]">
                               {currentStageData.score?.toFixed(1) || "0.0"}
                             </span>
-                            <span className="text-lg text-gray-500">/ 10</span>
                           </div>
                         </div>
                       </div>
@@ -473,86 +548,136 @@ export function SubmissionDetailModal({
                         الإجابات المقدمة
                       </h4>
 
-                      {Object.entries(currentStageData.data || {})
-                        .sort(([fieldNameA], [fieldNameB]) => {
-                          const fieldA = getStageFields(activeTab).find(
-                            (f) => f.field_name === fieldNameA
-                          );
-                          const fieldB = getStageFields(activeTab).find(
-                            (f) => f.field_name === fieldNameB
-                          );
-                          return (
-                            (fieldA?.display_order || 999) -
-                            (fieldB?.display_order || 999)
-                          );
-                        })
-                        .map(([fieldName, value]) => {
-                          const field = getStageFields(activeTab).find(
-                            (f) => f.field_name === fieldName
-                          );
-                          if (!field) return null;
+                      {/* Separate AI and non-AI fields */}
+                      {(() => {
+                        const allEntries = Object.entries(
+                          currentStageData.data || {}
+                        )
+                          .sort(([fieldNameA], [fieldNameB]) => {
+                            const fieldA = getStageFields(activeTab).find(
+                              (f) => f.field_name === fieldNameA
+                            );
+                            const fieldB = getStageFields(activeTab).find(
+                              (f) => f.field_name === fieldNameB
+                            );
+                            return (
+                              (fieldA?.display_order || 999) -
+                              (fieldB?.display_order || 999)
+                            );
+                          })
+                          .map(([fieldName, value]) => {
+                            const field = getStageFields(activeTab).find(
+                              (f) => f.field_name === fieldName
+                            );
+                            return { fieldName, value, field };
+                          })
+                          .filter(({ field }) => field);
 
-                          const hasWeight = field.has_weight;
-                          const isAI = field.is_ai_calculated;
-                          const selectedOption = field.options?.options?.find(
-                            (opt: any) => opt.value === value
-                          );
-                          const fieldScore = selectedOption?.weight || 0;
+                        const aiFields = allEntries.filter(
+                          ({ field }) => field?.is_ai_calculated
+                        );
+                        const nonAIFields = allEntries.filter(
+                          ({ field }) => !field?.is_ai_calculated
+                        );
 
-                          // Get AI evaluation
-                          const aiEvaluation =
-                            field.question_title &&
-                            currentStageData.ai_evaluations
-                              ? currentStageData.ai_evaluations[
-                                  field.question_title
-                                ]
-                              : null;
+                        return (
+                          <>
+                            {/* Non-AI fields in 2 columns */}
+                            {nonAIFields.length > 0 && (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {nonAIFields.map(
+                                  ({ fieldName, value, field }) => {
+                                    if (!field) return null;
+                                    const hasWeight = field.has_weight;
+                                    const selectedOption =
+                                      field.options?.options?.find(
+                                        (opt: any) => opt.value === value
+                                      );
+                                    const fieldScore =
+                                      selectedOption?.weight || 0;
 
-                          return (
-                            <div
-                              key={fieldName}
-                              className={`rounded-2xl p-5 border-2 ${
-                                isAI
-                                  ? "bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200"
-                                  : hasWeight
-                                  ? "bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200"
-                                  : "bg-white border-gray-200"
-                              }`}
-                            >
-                              <div className="flex items-start justify-between mb-3">
-                                <div className="flex-1">
-                                  <h5 className="font-bold text-gray-900 mb-1">
-                                    {field.label}
-                                  </h5>
-                                  {field.question_title && (
-                                    <p className="text-sm text-gray-600">
-                                      {field.question_title}
-                                    </p>
-                                  )}
-                                </div>
-                                {hasWeight && !isAI && (
-                                  <span className="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md">
-                                    {fieldScore} نقطة
-                                  </span>
-                                )}
-                                {isAI && (
-                                  <span className="inline-flex items-center gap-1 px-4 py-2 rounded-xl text-sm font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md">
-                                    <Award className="w-4 h-4" />
-                                    AI تقييم
-                                  </span>
+                                    return (
+                                      <div
+                                        key={fieldName}
+                                        className={`rounded-xl p-3 border ${
+                                          hasWeight
+                                            ? "bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200"
+                                            : "bg-white border-gray-200"
+                                        }`}
+                                      >
+                                        <div className="flex items-start justify-between mb-2">
+                                          <h5 className="text-sm font-semibold text-gray-900 flex-1">
+                                            {field.label}
+                                          </h5>
+                                          {hasWeight && (
+                                            <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white ml-2">
+                                              {fieldScore}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="bg-white/60 rounded-lg p-2">
+                                          <p className="text-sm text-gray-900">
+                                            {renderValue(value, field)}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    );
+                                  }
                                 )}
                               </div>
+                            )}
 
-                              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 mb-3">
-                                <p className="text-gray-900 leading-relaxed whitespace-pre-wrap">
-                                  {renderValue(value, field)}
-                                </p>
+                            {/* AI fields full width */}
+                            {aiFields.length > 0 && (
+                              <div className="space-y-3 mt-4">
+                                {aiFields.map(({ fieldName, value, field }) => {
+                                  if (!field) return null;
+
+                                  const aiEvaluation =
+                                    field.question_title &&
+                                    currentStageData.ai_evaluations
+                                      ? currentStageData.ai_evaluations[
+                                          field.question_title
+                                        ]
+                                      : null;
+
+                                  return (
+                                    <div
+                                      key={fieldName}
+                                      className="rounded-xl p-4 border-2 bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200"
+                                    >
+                                      <div className="flex items-start justify-between mb-3">
+                                        <div className="flex-1">
+                                          <h5 className="font-bold text-gray-900 mb-1">
+                                            {field.label}
+                                          </h5>
+                                          {field.question_title && (
+                                            <p className="text-sm text-gray-600">
+                                              {field.question_title}
+                                            </p>
+                                          )}
+                                        </div>
+                                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md">
+                                          <Award className="w-3 h-3" />
+                                          AI تقييم
+                                        </span>
+                                      </div>
+
+                                      <div className="bg-white/80 backdrop-blur-sm rounded-lg p-3 mb-3">
+                                        <p className="text-sm text-gray-900 leading-relaxed whitespace-pre-wrap">
+                                          {renderValue(value, field)}
+                                        </p>
+                                      </div>
+
+                                      {renderAIEvaluation(aiEvaluation)}
+                                    </div>
+                                  );
+                                })}
                               </div>
-
-                              {renderAIEvaluation(aiEvaluation)}
-                            </div>
-                          );
-                        })}
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </motion.div>
                 </AnimatePresence>

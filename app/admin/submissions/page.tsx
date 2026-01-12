@@ -65,6 +65,8 @@ type FormField = {
   question_title?: string;
   is_ai_calculated?: boolean;
   display_order?: number;
+  stage?: number;
+  weight?: number;
 };
 
 export default function SubmissionsPage() {
@@ -99,7 +101,7 @@ export default function SubmissionsPage() {
       const { data, error } = await supabase
         .from("form_fields")
         .select(
-          "id, field_name, label, field_type, options, has_weight, question_title, is_ai_calculated, display_order"
+          "id, field_name, label, field_type, options, has_weight, question_title, is_ai_calculated, display_order, stage, weight"
         )
         .order("display_order");
 
@@ -447,10 +449,18 @@ export default function SubmissionsPage() {
     ];
   };
 
+  const allowedFilterFields = [
+    "age",
+    "gender",
+    "employment_status",
+    "education_level",
+    "experience_years",
+  ];
+
   const selectRadioFields = formFields.filter(
     (f) =>
       (f.field_type === "select" || f.field_type === "radio") &&
-      f.field_name !== "city"
+      allowedFilterFields.includes(f.field_name)
   );
 
   if (loading) {
