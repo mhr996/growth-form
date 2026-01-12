@@ -68,8 +68,7 @@ export function SubmissionDetailModal({
 
     setLoading(true);
     try {
-      // Since there's only one submission per user with all stage data combined,
-      // we need to separate the data by stage based on field names
+      // Read from stage-specific data columns
       const stageDataMap: Record<number, StageData> = {};
 
       // Group fields by stage
@@ -79,18 +78,31 @@ export function SubmissionDetailModal({
         3: formFields.filter((f) => f.stage === 3),
       };
 
-      // Separate submission data by stage
+      // Process each stage using stage-specific data columns
       [1, 2, 3].forEach((stageNum) => {
         const stageFields = fieldsByStage[stageNum];
-        const stageData: any = {};
+
+        // Get data from stage-specific column
+        // Stage 1: data, Stage 2: data_stage_2, Stage 3: data_stage_3
+        let stageData: any = {};
+        let stageAiEvaluations: any = {};
+
+        if (stageNum === 1) {
+          stageData = submission.data || {};
+          stageAiEvaluations = submission.ai_evaluations || {};
+        } else if (stageNum === 2) {
+          stageData = (submission as any).data_stage_2 || {};
+          stageAiEvaluations = (submission as any).ai_evaluations_stage_2 || {};
+        } else if (stageNum === 3) {
+          stageData = (submission as any).data_stage_3 || {};
+          stageAiEvaluations = (submission as any).ai_evaluations_stage_3 || {};
+        }
+
         let hasData = false;
 
+        // Check if this stage has any data
         stageFields.forEach((field) => {
-          if (
-            submission.data &&
-            submission.data[field.field_name] !== undefined
-          ) {
-            stageData[field.field_name] = submission.data[field.field_name];
+          if (stageData[field.field_name] !== undefined) {
             hasData = true;
           }
         });
@@ -107,13 +119,13 @@ export function SubmissionDetailModal({
                 stageScore += selectedOption.weight;
               }
             }
-            // Add AI evaluation scores
+            // Add AI evaluation scores from stage-specific AI evaluations
             if (
               field.is_ai_calculated &&
               field.question_title &&
-              submission.ai_evaluations?.[field.question_title]
+              stageAiEvaluations?.[field.question_title]
             ) {
-              const aiEval = submission.ai_evaluations[field.question_title];
+              const aiEval = stageAiEvaluations[field.question_title];
               if (aiEval?.evaluation) {
                 // Try to extract score from AI evaluation
                 const evaluation = aiEval.evaluation;
@@ -148,7 +160,7 @@ export function SubmissionDetailModal({
             stage: stageNum,
             score: stageScore,
             data: stageData,
-            ai_evaluations: submission.ai_evaluations,
+            ai_evaluations: stageAiEvaluations,
             created_at: submission.created_at,
           };
         }

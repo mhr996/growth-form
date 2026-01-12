@@ -164,12 +164,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get form fields with AI prompts for stage 1
+    // Get the submission to determine which stage to evaluate
     const supabase = await createClient();
+    const { data: submission, error: submissionError } = await supabase
+      .from("form_submissions")
+      .select("stage")
+      .eq("id", submissionId)
+      .single();
+
+    if (submissionError || !submission) {
+      console.error("Error fetching submission:", submissionError);
+      return NextResponse.json(
+        { error: "Failed to fetch submission" },
+        { status: 500 }
+      );
+    }
+
+    const currentStage = submission.stage;
+
+    // Get form fields with AI prompts for current stage
     const { data: fields, error: fieldsError } = await supabase
       .from("form_fields")
       .select("*")
-      .eq("stage", 1)
+      .eq("stage", currentStage)
       .eq("is_ai_calculated", true);
 
     if (fieldsError) {
@@ -230,11 +247,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Save evaluations to database
+    // Save evaluations to database using stage-specific column
+    // Stage 1: ai_evaluations, Stage 2: ai_evaluations_stage_2, Stage 3: ai_evaluations_stage_3
+    const aiEvaluationsColumn =
+      currentStage === 1
+        ? "ai_evaluations"
+        : `ai_evaluations_stage_${currentStage}`;
+
     const { error: updateError } = await supabase
       .from("form_submissions")
       .update({
-        ai_evaluations: evaluations,
+        [aiEvaluationsColumn]: evaluations,
         updated_at: new Date().toISOString(),
       })
       .eq("id", submissionId);

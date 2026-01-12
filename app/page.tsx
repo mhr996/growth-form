@@ -324,30 +324,66 @@ export default function Home() {
         }
       });
 
-      const { data: submission, error } = await supabase
+      // Check if submission already exists
+      const { data: existingSubmission } = await supabase
         .from("form_submissions")
-        .insert([
-          {
-            user_email: user?.email,
-            stage: currentStep,
-            data: formValues,
-            score: totalScore,
-            channel: invitee?.channel || null,
-            note: invitee?.note || null,
-          },
-        ])
-        .select()
+        .select("id")
+        .eq("user_email", user?.email)
         .single();
 
-      if (error) throw error;
+      // Prepare submission data based on stage
+      const submissionData: any = {
+        user_email: user?.email,
+        stage: currentStep,
+        score: totalScore,
+      };
+
+      // Save to stage-specific columns
+      if (currentStep === 1) {
+        submissionData.data = formValues;
+      } else if (currentStep === 2) {
+        submissionData.data_stage_2 = formValues;
+      } else if (currentStep === 3) {
+        submissionData.data_stage_3 = formValues;
+      }
+
+      // Add channel and note only on first submission
+      if (!existingSubmission) {
+        submissionData.channel = invitee?.channel || null;
+        submissionData.note = invitee?.note || null;
+      }
+
+      let submission;
+      if (existingSubmission) {
+        // Update existing submission
+        const { data, error } = await supabase
+          .from("form_submissions")
+          .update(submissionData)
+          .eq("id", existingSubmission.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        submission = data;
+      } else {
+        // Insert new submission
+        const { data, error } = await supabase
+          .from("form_submissions")
+          .insert([submissionData])
+          .select()
+          .single();
+
+        if (error) throw error;
+        submission = data;
+      }
 
       // Lock the form and show success modal immediately
       setIsFormLocked(true);
       setHasSubmitted(true);
       setShowSuccessModal(true);
 
-      // Trigger async AI evaluation for Stage 1 only (don't wait for it)
-      if (currentStep === 1 && submission?.id) {
+      // Trigger async AI evaluation for all stages (don't wait for it)
+      if (submission?.id) {
         fetch("/api/evaluate-submission", {
           method: "POST",
           headers: {

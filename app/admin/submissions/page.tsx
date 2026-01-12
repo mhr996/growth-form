@@ -193,16 +193,29 @@ export default function SubmissionsPage() {
   ): number => {
     let stageScore = 0;
 
+    // Get data from stage-specific column
+    // Stage 1: data, Stage 2: data_stage_2, Stage 3: data_stage_3
+    let stageData: any = {};
+    let stageAiEvaluations: any = {};
+
+    if (stage === 1) {
+      stageData = submission.data || {};
+      stageAiEvaluations = submission.ai_evaluations || {};
+    } else if (stage === 2) {
+      stageData = (submission as any).data_stage_2 || {};
+      stageAiEvaluations = (submission as any).ai_evaluations_stage_2 || {};
+    } else if (stage === 3) {
+      stageData = (submission as any).data_stage_3 || {};
+      stageAiEvaluations = (submission as any).ai_evaluations_stage_3 || {};
+    }
+
     formFields.forEach((field) => {
       // Only calculate for fields in this stage
       if (field.stage !== stage) return;
 
-      if (
-        field.has_weight &&
-        submission.data?.[field.field_name] !== undefined
-      ) {
+      if (field.has_weight && stageData[field.field_name] !== undefined) {
         const selectedOption = field.options?.options?.find(
-          (opt: any) => opt.value === submission.data[field.field_name]
+          (opt: any) => opt.value === stageData[field.field_name]
         );
         if (selectedOption?.weight) {
           stageScore += selectedOption.weight;
@@ -213,9 +226,9 @@ export default function SubmissionsPage() {
       if (
         field.is_ai_calculated &&
         field.question_title &&
-        submission.ai_evaluations?.[field.question_title]
+        stageAiEvaluations[field.question_title]
       ) {
-        const aiEval = submission.ai_evaluations[field.question_title];
+        const aiEval = stageAiEvaluations[field.question_title];
         if (aiEval?.evaluation) {
           const evaluation = aiEval.evaluation;
           if (typeof evaluation === "object" && !Array.isArray(evaluation)) {
@@ -471,9 +484,16 @@ export default function SubmissionsPage() {
         }),
       };
 
+      // Combine all stage data
+      const allData = {
+        ...(sub.data || {}),
+        ...((sub as any).data_stage_2 || {}),
+        ...((sub as any).data_stage_3 || {}),
+      };
+
       // Parse data if it's a string
       const submissionData =
-        typeof sub.data === "string" ? JSON.parse(sub.data) : sub.data;
+        typeof allData === "string" ? JSON.parse(allData) : allData;
 
       // Add form fields with Arabic labels
       Object.keys(submissionData || {}).forEach((fieldName) => {
