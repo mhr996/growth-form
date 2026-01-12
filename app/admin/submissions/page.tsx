@@ -133,6 +133,117 @@ export default function SubmissionsPage() {
     }
   };
 
+  // Calculate score dynamically from field weights
+  const calculateScore = (submission: Submission): number => {
+    let totalScore = 0;
+
+    formFields.forEach((field) => {
+      if (
+        field.has_weight &&
+        submission.data?.[field.field_name] !== undefined
+      ) {
+        const selectedOption = field.options?.options?.find(
+          (opt: any) => opt.value === submission.data[field.field_name]
+        );
+        if (selectedOption?.weight) {
+          totalScore += selectedOption.weight;
+        }
+      }
+
+      // Add AI evaluation scores
+      if (
+        field.is_ai_calculated &&
+        field.question_title &&
+        submission.ai_evaluations?.[field.question_title]
+      ) {
+        const aiEval = submission.ai_evaluations[field.question_title];
+        if (aiEval?.evaluation) {
+          const evaluation = aiEval.evaluation;
+          if (typeof evaluation === "object" && !Array.isArray(evaluation)) {
+            // Sum up all criterion results
+            const breakdownEntries = Object.entries(evaluation).filter(
+              ([key]) => !["error", "total"].includes(key)
+            );
+            const aiScore = breakdownEntries.reduce(
+              (sum, [_, data]: [string, any]) => {
+                if (
+                  typeof data === "object" &&
+                  data !== null &&
+                  typeof data.result === "number"
+                ) {
+                  return sum + data.result;
+                }
+                return sum;
+              },
+              0
+            );
+            totalScore += aiScore;
+          }
+        }
+      }
+    });
+
+    return totalScore;
+  };
+
+  // Calculate score for a specific stage
+  const calculateStageScore = (
+    submission: Submission,
+    stage: number
+  ): number => {
+    let stageScore = 0;
+
+    formFields.forEach((field) => {
+      // Only calculate for fields in this stage
+      if (field.stage !== stage) return;
+
+      if (
+        field.has_weight &&
+        submission.data?.[field.field_name] !== undefined
+      ) {
+        const selectedOption = field.options?.options?.find(
+          (opt: any) => opt.value === submission.data[field.field_name]
+        );
+        if (selectedOption?.weight) {
+          stageScore += selectedOption.weight;
+        }
+      }
+
+      // Add AI evaluation scores for this stage
+      if (
+        field.is_ai_calculated &&
+        field.question_title &&
+        submission.ai_evaluations?.[field.question_title]
+      ) {
+        const aiEval = submission.ai_evaluations[field.question_title];
+        if (aiEval?.evaluation) {
+          const evaluation = aiEval.evaluation;
+          if (typeof evaluation === "object" && !Array.isArray(evaluation)) {
+            const breakdownEntries = Object.entries(evaluation).filter(
+              ([key]) => !["error", "total"].includes(key)
+            );
+            const aiScore = breakdownEntries.reduce(
+              (sum, [_, data]: [string, any]) => {
+                if (
+                  typeof data === "object" &&
+                  data !== null &&
+                  typeof data.result === "number"
+                ) {
+                  return sum + data.result;
+                }
+                return sum;
+              },
+              0
+            );
+            stageScore += aiScore;
+          }
+        }
+      }
+    });
+
+    return stageScore;
+  };
+
   const filteredSubmissions = submissions.filter((sub) => {
     const matchesSearch =
       sub.user_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -169,8 +280,8 @@ export default function SubmissionsPage() {
 
     switch (sortField) {
       case "score":
-        aValue = a.score || 0;
-        bValue = b.score || 0;
+        aValue = calculateScore(a);
+        bValue = calculateScore(b);
         break;
       case "age":
         aValue = parseInt(a.data?.age) || 0;
@@ -791,11 +902,25 @@ export default function SubmissionsPage() {
                     رقم الجوال
                   </th>
                   <th
-                    className="px-6 py-4 text-right text-sm font-bold cursor-pointer hover:bg-white/10 transition-colors"
+                    className="px-4 py-4 text-right text-sm font-bold cursor-pointer hover:bg-white/10 transition-colors"
                     onClick={() => handleSort("score")}
                   >
                     <div className="flex items-center justify-end gap-2">
-                      النقاط
+                      المرحلة 1{getSortIcon("score")}
+                    </div>
+                  </th>
+                  <th className="px-4 py-4 text-right text-sm font-bold">
+                    المرحلة 2
+                  </th>
+                  <th className="px-4 py-4 text-right text-sm font-bold">
+                    المرحلة 3
+                  </th>
+                  <th
+                    className="px-4 py-4 text-right text-sm font-bold cursor-pointer hover:bg-white/10 transition-colors"
+                    onClick={() => handleSort("score")}
+                  >
+                    <div className="flex items-center justify-end gap-2">
+                      المجموع
                       {getSortIcon("score")}
                     </div>
                   </th>
@@ -876,9 +1001,24 @@ export default function SubmissionsPage() {
                     <td className="px-6 py-4 text-sm text-gray-600" dir="ltr">
                       {submission.data?.phoneNumber || "-"}
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
-                        {submission.score?.toFixed(1) || "0.0"}
+                    <td className="px-4 py-4">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">
+                        {calculateStageScore(submission, 1).toFixed(1)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700">
+                        {calculateStageScore(submission, 2).toFixed(1)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
+                        {calculateStageScore(submission, 3).toFixed(1)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
+                        {calculateScore(submission).toFixed(1)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">

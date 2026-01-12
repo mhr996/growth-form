@@ -20,6 +20,7 @@ export default function SettingsPage() {
       const { data, error } = await supabase
         .from("stage_settings")
         .select("active_stage")
+        .eq("stage", 1) // Load from stage 1 row
         .single();
 
       if (error && error.code !== "PGRST116") throw error;
@@ -39,10 +40,11 @@ export default function SettingsPage() {
     setSaved(false);
 
     try {
-      // Check if settings exist
+      // Check if settings exist for stage 1
       const { data: existing } = await supabase
         .from("stage_settings")
         .select("id")
+        .eq("stage", 1)
         .single();
 
       if (existing) {
@@ -54,10 +56,10 @@ export default function SettingsPage() {
 
         if (error) throw error;
       } else {
-        // Insert new
+        // Insert new with stage column
         const { error } = await supabase
           .from("stage_settings")
-          .insert({ active_stage: activeStage });
+          .insert({ stage: 1, active_stage: activeStage });
 
         if (error) throw error;
       }

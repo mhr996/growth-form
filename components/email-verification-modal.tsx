@@ -30,40 +30,39 @@ export function EmailVerificationModal({
       // Trim the email
       const trimmedEmail = email.trim();
 
-      // Check if the email exists in the invitees table - fetch all and check in JS
-      const { data: invitees, error: inviteeError } = await supabase
-        .from("invitees")
-        .select("email");
+      // First, check if the email exists in form_submissions table (returning user)
+      const { data: submission, error: submissionError } = await supabase
+        .from("form_submissions")
+        .select("user_email")
+        .eq("user_email", trimmedEmail)
+        .maybeSingle();
 
-      if (inviteeError) {
-        console.error("Invitee check error:", inviteeError);
+      if (submissionError && submissionError.code !== "PGRST116") {
+        console.error("Submission check error:", submissionError);
         setError("حدث خطأ أثناء التحقق من البريد الإلكتروني.");
         setLoading(false);
         return;
       }
 
-      // Check if the email exists (case-insensitive)
-      const emailExists = invitees?.some(
-        (inv) => inv.email?.toLowerCase().trim() === trimmedEmail.toLowerCase()
-      );
+      // If user exists in submissions, send login email directly
+      if (submission) {
+        const { error } = await supabase.auth.signInWithOtp({
+          email: trimmedEmail,
+          options: {
+            shouldCreateUser: true,
+          },
+        });
 
-      if (!emailExists) {
-        setError("عذراً، هذا البريد الإلكتروني غير مدرج في قائمة المدعوين.");
+        if (error) throw error;
+        setStep("sent");
         setLoading(false);
         return;
       }
 
-      // If email is in invitees table, send magic link using Supabase Auth
-      const { error } = await supabase.auth.signInWithOtp({
-        email: trimmedEmail,
-        options: {
-          shouldCreateUser: true,
-        },
-      });
-
-      if (error) throw error;
-
-      setStep("sent");
+      // If not in submissions, show error
+      setError("عذراً، هذا البريد الإلكتروني غير موجود في النظام.");
+      setLoading(false);
+      return;
     } catch (err: any) {
       setError(err.message || "فشل إرسال رابط التحقق. حاول مرة أخرى.");
     } finally {

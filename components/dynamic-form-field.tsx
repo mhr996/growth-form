@@ -124,7 +124,7 @@ export function DynamicFormField({
       case "radio":
         const radioOptions = field.options?.options || [];
         return (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {radioOptions.map((opt: any) => (
               <motion.label
                 key={opt.value}
@@ -146,10 +146,10 @@ export function DynamicFormField({
                   checked={value === opt.value}
                   onChange={(e) => onChange(e.target.value)}
                   required={field.is_required}
-                  className="w-5 h-5 text-[#2A3984] focus:ring-[#2A3984]"
+                  className="w-5 h-5 text-[#2A3984] focus:ring-[#2A3984] flex-shrink-0"
                 />
                 <span
-                  className={`font-medium ${
+                  className={`text-sm font-medium ${
                     value === opt.value ? "text-[#2A3984]" : "text-gray-700"
                   }`}
                 >

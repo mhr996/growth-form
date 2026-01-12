@@ -58,6 +58,24 @@ export default function Home() {
     status?: string;
   } | null>(null);
 
+  // Load active stage from database on mount
+  useEffect(() => {
+    const loadActiveStage = async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("stage_settings")
+        .select("active_stage")
+        .eq("stage", 1)
+        .single();
+
+      if (!error && data?.active_stage) {
+        setCurrentStep(data.active_stage);
+      }
+    };
+
+    loadActiveStage();
+  }, []);
+
   // Check if user has already submitted (do this FIRST before showing welcome modal)
   useEffect(() => {
     const checkSubmission = async () => {
@@ -537,9 +555,9 @@ export default function Home() {
 
                 {/* Stepper */}
                 <div className="px-6 sm:px-10 py-8 border-b border-gray-100">
-                  <div className="flex items-center justify-between relative">
+                  <div className="flex items-start justify-between relative max-w-4xl mx-auto">
                     {/* Progress Line */}
-                    <div className="absolute right-0 top-1/2 h-1 w-full -translate-y-1/2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="absolute right-0 top-6 sm:top-7 h-1 w-full bg-gray-100 rounded-full overflow-hidden">
                       <motion.div
                         className="h-full bg-gradient-to-r from-[#2A3984] to-[#3a4a9f]"
                         initial={{ width: "0%" }}
@@ -561,7 +579,7 @@ export default function Home() {
                       return (
                         <div
                           key={step.id}
-                          className="flex flex-col items-center gap-3 relative z-10"
+                          className="flex flex-col items-center gap-2 relative z-10 flex-1"
                         >
                           <motion.div
                             className={`
@@ -607,7 +625,7 @@ export default function Home() {
                           </motion.div>
                           <span
                             className={`
-                          text-xs sm:text-sm font-medium text-center mt-3 max-w-[200px]
+                          text-xs sm:text-sm font-medium text-center mt-2 px-2 leading-tight
                           ${
                             isCompleted || isCurrent
                               ? "text-[#2A3984]"
@@ -750,7 +768,13 @@ export default function Home() {
                       )}
 
                       {/* Dynamic Fields - 2 columns grid with full-width support */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div
+                        className={`grid ${
+                          currentStep === 2
+                            ? "grid-cols-1"
+                            : "grid-cols-1 md:grid-cols-2"
+                        } ${currentStep === 2 ? "gap-12" : "gap-6"}`}
+                      >
                         {formFields.map((field) => {
                           // Check if field should be shown based on conditional rules
                           const shouldShow = () => {
@@ -781,7 +805,9 @@ export default function Home() {
                             <div
                               key={field.id}
                               className={
-                                field.full_width ? "md:col-span-2" : ""
+                                field.full_width || currentStep === 2
+                                  ? "md:col-span-2"
+                                  : ""
                               }
                             >
                               <DynamicFormField
