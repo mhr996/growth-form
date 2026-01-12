@@ -271,10 +271,26 @@ export function FieldEditModalStage2({
                           تعليمات التقييم بالذكاء الاصطناعي
                         </label>
                         <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
-                          <p className="text-sm text-purple-700 mb-3">
-                            {formData.ai_prompt?.prompt ||
-                              "لم يتم تعيين تعليمات التقييم"}
-                          </p>
+                          <div className="text-sm text-purple-700 mb-3 max-h-32 overflow-y-auto">
+                            {typeof formData.ai_prompt === "string" ? (
+                              <p>{formData.ai_prompt}</p>
+                            ) : formData.ai_prompt?.instruction ? (
+                              <div className="space-y-2">
+                                <p>
+                                  <strong>التعليمات:</strong>{" "}
+                                  {formData.ai_prompt.instruction}
+                                </p>
+                                {formData.ai_prompt.context && (
+                                  <p>
+                                    <strong>السياق:</strong>{" "}
+                                    {formData.ai_prompt.context}
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <p>لم يتم تعيين تعليمات التقييم</p>
+                            )}
+                          </div>
                           <button
                             onClick={() => setShowAiPromptBuilder(true)}
                             className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
@@ -345,14 +361,18 @@ export function FieldEditModalStage2({
         <AIPromptBuilderModal
           isOpen={showAiPromptBuilder}
           onClose={() => setShowAiPromptBuilder(false)}
-          initialPrompt={formData.ai_prompt?.prompt || ""}
-          onSave={(prompt) => {
+          initialPrompt={
+            typeof formData.ai_prompt === "string"
+              ? formData.ai_prompt
+              : formData.ai_prompt
+              ? JSON.stringify(formData.ai_prompt)
+              : ""
+          }
+          onSave={(promptData) => {
+            // promptData is already a complete object from AIPromptBuilderModal
             setFormData({
               ...formData,
-              ai_prompt: {
-                ...formData.ai_prompt,
-                prompt: prompt,
-              },
+              ai_prompt: promptData,
             });
             setShowAiPromptBuilder(false);
           }}
