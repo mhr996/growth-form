@@ -218,7 +218,10 @@ export default function SubmissionsPage() {
           (opt: any) => opt.value === stageData[field.field_name]
         );
         if (selectedOption?.weight) {
-          stageScore += selectedOption.weight;
+          // For Stage 2, multiply weight by 1000 (e.g., 8% = 80 points)
+          // For other stages, use weight as-is
+          const weightMultiplier = stage === 2 ? 1000 : 1;
+          stageScore += selectedOption.weight * weightMultiplier;
         }
       }
 
@@ -248,6 +251,8 @@ export default function SubmissionsPage() {
               },
               0
             );
+            // For Stage 2, AI returns pre-calculated score, add directly
+            // For other stages, add as-is
             stageScore += aiScore;
           }
         }

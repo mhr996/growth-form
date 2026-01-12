@@ -46,6 +46,7 @@ interface FormField {
   is_ai_calculated?: boolean;
   full_width?: boolean;
   ai_prompt?: any;
+  stage?: number;
 }
 
 export function FieldEditModal({
@@ -259,8 +260,9 @@ export function FieldEditModal({
                         </span>
                       </p>
                       <p className="text-xs text-blue-700 mt-2">
-                        لا يمكن تعيين وزن يدوي لهذا الحقل حيث سيتم حسابه
-                        تلقائياً
+                        {formData.stage === 2
+                          ? "الذكاء الاصطناعي يُرجع نتيجة محسوبة مُسبقاً، لا حاجة لتعيين وزن"
+                          : "لا يمكن تعيين وزن يدوي لهذا الحقل حيث سيتم حسابه تلقائياً"}
                       </p>
                     </div>
                     <div className="space-y-2">
@@ -303,596 +305,604 @@ export function FieldEditModal({
                   </div>
                 )}
                 {(formData.field_type === "select" ||
-                  formData.field_type === "radio") && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                        <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                        الخيارات المتاحة
-                      </label>
+                  formData.field_type === "radio") &&
+                  !formData.is_ai_calculated && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                          <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                          الخيارات المتاحة
+                        </label>
+                        {shouldShowWeights && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const options = formData.options?.options || [];
+                              const distributed =
+                                autoDistributeWeights(options);
+                              setFormData({
+                                ...formData,
+                                options: {
+                                  ...formData.options,
+                                  options: distributed,
+                                },
+                              });
+                            }}
+                            className="text-xs px-3 py-1.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors font-semibold"
+                          >
+                            توزيع تلقائي
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Weight Total Indicator - only show if 2+ options */}
                       {shouldShowWeights && (
-                        <button
+                        <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-2 rounded-xl p-4 space-y-3">
+                          {/* Quick Presets */}
+                          <div className="space-y-2">
+                            <label className="text-xs font-semibold text-gray-700">
+                              توزيع سريع:
+                            </label>
+                            <div className="flex flex-wrap gap-2">
+                              {/* Generate preset buttons based on number of options */}
+                              {formData.options?.options?.length === 2 && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newOptions = [
+                                        ...(formData.options?.options || []),
+                                      ];
+                                      newOptions[0].weight = 500;
+                                      newOptions[1].weight = 500;
+                                      setFormData({
+                                        ...formData,
+                                        options: {
+                                          ...formData.options,
+                                          options: newOptions,
+                                        },
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
+                                  >
+                                    50% / 50%
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newOptions = [
+                                        ...(formData.options?.options || []),
+                                      ];
+                                      newOptions[0].weight = 700;
+                                      newOptions[1].weight = 300;
+                                      setFormData({
+                                        ...formData,
+                                        options: {
+                                          ...formData.options,
+                                          options: newOptions,
+                                        },
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
+                                  >
+                                    70% / 30%
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newOptions = [
+                                        ...(formData.options?.options || []),
+                                      ];
+                                      newOptions[0].weight = 300;
+                                      newOptions[1].weight = 700;
+                                      setFormData({
+                                        ...formData,
+                                        options: {
+                                          ...formData.options,
+                                          options: newOptions,
+                                        },
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
+                                  >
+                                    30% / 70%
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newOptions = [
+                                        ...(formData.options?.options || []),
+                                      ];
+                                      newOptions[0].weight = 600;
+                                      newOptions[1].weight = 400;
+                                      setFormData({
+                                        ...formData,
+                                        options: {
+                                          ...formData.options,
+                                          options: newOptions,
+                                        },
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
+                                  >
+                                    60% / 40%
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newOptions = [
+                                        ...(formData.options?.options || []),
+                                      ];
+                                      newOptions[0].weight = 800;
+                                      newOptions[1].weight = 200;
+                                      setFormData({
+                                        ...formData,
+                                        options: {
+                                          ...formData.options,
+                                          options: newOptions,
+                                        },
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
+                                  >
+                                    80% / 20%
+                                  </button>
+                                </>
+                              )}
+                              {formData.options?.options?.length === 3 && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newOptions = [
+                                        ...(formData.options?.options || []),
+                                      ];
+                                      newOptions[0].weight = 334;
+                                      newOptions[1].weight = 333;
+                                      newOptions[2].weight = 333;
+                                      setFormData({
+                                        ...formData,
+                                        options: {
+                                          ...formData.options,
+                                          options: newOptions,
+                                        },
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
+                                  >
+                                    33% / 33% / 33%
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newOptions = [
+                                        ...(formData.options?.options || []),
+                                      ];
+                                      newOptions[0].weight = 500;
+                                      newOptions[1].weight = 300;
+                                      newOptions[2].weight = 200;
+                                      setFormData({
+                                        ...formData,
+                                        options: {
+                                          ...formData.options,
+                                          options: newOptions,
+                                        },
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
+                                  >
+                                    50% / 30% / 20%
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newOptions = [
+                                        ...(formData.options?.options || []),
+                                      ];
+                                      newOptions[0].weight = 600;
+                                      newOptions[1].weight = 300;
+                                      newOptions[2].weight = 100;
+                                      setFormData({
+                                        ...formData,
+                                        options: {
+                                          ...formData.options,
+                                          options: newOptions,
+                                        },
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
+                                  >
+                                    60% / 30% / 10%
+                                  </button>
+                                </>
+                              )}
+                              {formData.options?.options?.length === 4 && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newOptions = [
+                                        ...(formData.options?.options || []),
+                                      ];
+                                      newOptions[0].weight = 250;
+                                      newOptions[1].weight = 250;
+                                      newOptions[2].weight = 250;
+                                      newOptions[3].weight = 250;
+                                      setFormData({
+                                        ...formData,
+                                        options: {
+                                          ...formData.options,
+                                          options: newOptions,
+                                        },
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
+                                  >
+                                    25% متساوي
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newOptions = [
+                                        ...(formData.options?.options || []),
+                                      ];
+                                      newOptions[0].weight = 400;
+                                      newOptions[1].weight = 300;
+                                      newOptions[2].weight = 200;
+                                      newOptions[3].weight = 100;
+                                      setFormData({
+                                        ...formData,
+                                        options: {
+                                          ...formData.options,
+                                          options: newOptions,
+                                        },
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
+                                  >
+                                    40% / 30% / 20% / 10%
+                                  </button>
+                                </>
+                              )}
+                              {formData.options?.options?.length === 5 && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newOptions = [
+                                        ...(formData.options?.options || []),
+                                      ];
+                                      newOptions[0].weight = 200;
+                                      newOptions[1].weight = 200;
+                                      newOptions[2].weight = 200;
+                                      newOptions[3].weight = 200;
+                                      newOptions[4].weight = 200;
+                                      setFormData({
+                                        ...formData,
+                                        options: {
+                                          ...formData.options,
+                                          options: newOptions,
+                                        },
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
+                                  >
+                                    20% متساوي
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newOptions = [
+                                        ...(formData.options?.options || []),
+                                      ];
+                                      newOptions[0].weight = 400;
+                                      newOptions[1].weight = 300;
+                                      newOptions[2].weight = 150;
+                                      newOptions[3].weight = 100;
+                                      newOptions[4].weight = 50;
+                                      setFormData({
+                                        ...formData,
+                                        options: {
+                                          ...formData.options,
+                                          options: newOptions,
+                                        },
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
+                                  >
+                                    تنازلي
+                                  </button>
+                                </>
+                              )}
+                              {/* For 6+ options, show equal distribution and descending pattern */}
+                              {formData.options?.options?.length >= 6 && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newOptions = [
+                                        ...(formData.options?.options || []),
+                                      ];
+                                      const equalWeight = Math.floor(
+                                        1000 / newOptions.length
+                                      );
+                                      const remainder =
+                                        1000 - equalWeight * newOptions.length;
+                                      newOptions.forEach((opt, idx) => {
+                                        opt.weight =
+                                          equalWeight +
+                                          (idx < remainder ? 1 : 0);
+                                      });
+                                      setFormData({
+                                        ...formData,
+                                        options: {
+                                          ...formData.options,
+                                          options: newOptions,
+                                        },
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
+                                  >
+                                    توزيع متساوي (
+                                    {Math.round(
+                                      1000 /
+                                        (formData.options?.options?.length || 1)
+                                    ) / 10}
+                                    %)
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newOptions = [
+                                        ...(formData.options?.options || []),
+                                      ];
+                                      // Create descending pattern
+                                      const count = newOptions.length;
+                                      const total = (count * (count + 1)) / 2; // Sum of 1+2+3+...+n
+                                      newOptions.forEach((opt, idx) => {
+                                        // Highest first, lowest last
+                                        const multiplier = count - idx;
+                                        opt.weight = Math.round(
+                                          (multiplier / total) * 1000
+                                        );
+                                      });
+                                      // Adjust for rounding errors
+                                      const currentTotal = newOptions.reduce(
+                                        (sum, opt) => sum + opt.weight,
+                                        0
+                                      );
+                                      if (currentTotal !== 1000) {
+                                        newOptions[0].weight +=
+                                          1000 - currentTotal;
+                                      }
+                                      setFormData({
+                                        ...formData,
+                                        options: {
+                                          ...formData.options,
+                                          options: newOptions,
+                                        },
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
+                                  >
+                                    توزيع تنازلي
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-gray-700">
+                              مجموع الأوزان:
+                            </span>
+                            <span
+                              className={`text-2xl font-bold ${
+                                isWeightValid
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }`}
+                            >
+                              {totalWeight}
+                            </span>
+                          </div>
+                          <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{
+                                width: `${Math.min(totalWeight / 10, 100)}%`,
+                              }}
+                              className={`h-full rounded-full ${
+                                isWeightValid
+                                  ? "bg-gradient-to-r from-green-500 to-green-600"
+                                  : totalWeight > 1000
+                                  ? "bg-gradient-to-r from-red-500 to-red-600"
+                                  : "bg-gradient-to-r from-amber-500 to-amber-600"
+                              }`}
+                            />
+                          </div>
+                          <p className="text-xs text-gray-600 flex items-center gap-1.5">
+                            {isWeightValid ? (
+                              <>
+                                <Check className="w-4 h-4 text-green-600" />
+                                ممتاز! المجموع يساوي 1000
+                              </>
+                            ) : (
+                              <>
+                                <Lightbulb className="w-4 h-4 text-amber-500" />
+                                يجب أن يكون مجموع الأوزان = 100 بالضبط
+                              </>
+                            )}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="space-y-3 bg-gray-50 p-4 rounded-xl border-2 border-gray-200">
+                        {(formData.options?.options || []).map(
+                          (option: any, index: number) => (
+                            <motion.div
+                              key={index}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: 20 }}
+                              className="bg-white p-3 rounded-xl border-2 border-gray-200 hover:border-[#2A3984]/30 transition-all space-y-2"
+                            >
+                              <div className="flex gap-2 items-center">
+                                <div className="flex items-center justify-center w-8 h-8 bg-[#2A3984]/10 text-[#2A3984] rounded-lg font-bold text-sm shrink-0">
+                                  {index + 1}
+                                </div>
+                                <input
+                                  type="text"
+                                  value={option.value}
+                                  onChange={(e) => {
+                                    const newOptions = [
+                                      ...(formData.options?.options || []),
+                                    ];
+                                    newOptions[index].value = e.target.value;
+                                    setFormData({
+                                      ...formData,
+                                      options: {
+                                        ...formData.options,
+                                        options: newOptions,
+                                      },
+                                    });
+                                  }}
+                                  placeholder="القيمة (value)"
+                                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all text-sm"
+                                />
+                                <input
+                                  type="text"
+                                  value={option.label}
+                                  onChange={(e) => {
+                                    const newOptions = [
+                                      ...(formData.options?.options || []),
+                                    ];
+                                    newOptions[index].label = e.target.value;
+                                    setFormData({
+                                      ...formData,
+                                      options: {
+                                        ...formData.options,
+                                        options: newOptions,
+                                      },
+                                    });
+                                  }}
+                                  placeholder="النص المعروض (label)"
+                                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all text-sm"
+                                />
+                                <motion.button
+                                  type="button"
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={() => {
+                                    let newOptions = (
+                                      formData.options?.options || []
+                                    ).filter(
+                                      (_: any, i: number) => i !== index
+                                    );
+
+                                    // Auto-distribute weights after deletion
+                                    newOptions =
+                                      autoDistributeWeights(newOptions);
+
+                                    setFormData({
+                                      ...formData,
+                                      options: {
+                                        ...formData.options,
+                                        options: newOptions,
+                                      },
+                                    });
+                                  }}
+                                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                                >
+                                  <Trash2 className="w-5 h-5" />
+                                </motion.button>
+                              </div>
+                              {shouldShowWeights && (
+                                <div className="flex items-center gap-3 pr-10">
+                                  <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">
+                                    الوزن:
+                                  </label>
+                                  <input
+                                    type="range"
+                                    min="0"
+                                    max="1000"
+                                    value={option.weight ?? 0}
+                                    onChange={(e) => {
+                                      const newOptions = [
+                                        ...(formData.options?.options || []),
+                                      ];
+                                      newOptions[index].weight = parseInt(
+                                        e.target.value
+                                      );
+                                      setFormData({
+                                        ...formData,
+                                        options: {
+                                          ...formData.options,
+                                          options: newOptions,
+                                        },
+                                      });
+                                    }}
+                                    className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#2A3984]"
+                                  />
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="1000"
+                                    value={option.weight ?? 0}
+                                    onChange={(e) => {
+                                      const newOptions = [
+                                        ...(formData.options?.options || []),
+                                      ];
+                                      const value =
+                                        parseInt(e.target.value) || 0;
+                                      newOptions[index].weight = Math.min(
+                                        1000,
+                                        Math.max(0, value)
+                                      );
+                                      setFormData({
+                                        ...formData,
+                                        options: {
+                                          ...formData.options,
+                                          options: newOptions,
+                                        },
+                                      });
+                                    }}
+                                    className="w-20 h-8 px-2 text-center bg-[#2A3984] text-white text-sm font-bold rounded-lg border-2 border-[#2A3984] focus:outline-none focus:ring-2 focus:ring-[#2A3984]/50"
+                                  />
+                                </div>
+                              )}
+                            </motion.div>
+                          )
+                        )}
+                        <motion.button
                           type="button"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
                           onClick={() => {
-                            const options = formData.options?.options || [];
-                            const distributed = autoDistributeWeights(options);
+                            let newOptions = [
+                              ...(formData.options?.options || []),
+                              { value: "", label: "", weight: 0 },
+                            ];
+
+                            // Auto-distribute weights after adding
+                            newOptions = autoDistributeWeights(newOptions);
+
                             setFormData({
                               ...formData,
                               options: {
                                 ...formData.options,
-                                options: distributed,
+                                options: newOptions,
                               },
                             });
                           }}
-                          className="text-xs px-3 py-1.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors font-semibold"
+                          className="w-full px-4 py-3 bg-white border-2 border-dashed border-[#2A3984]/30 rounded-xl text-[#2A3984] font-semibold hover:bg-[#2A3984]/5 transition-all flex items-center justify-center gap-2"
                         >
-                          توزيع تلقائي
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Weight Total Indicator - only show if 2+ options */}
-                    {shouldShowWeights && (
-                      <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-2 rounded-xl p-4 space-y-3">
-                        {/* Quick Presets */}
-                        <div className="space-y-2">
-                          <label className="text-xs font-semibold text-gray-700">
-                            توزيع سريع:
-                          </label>
-                          <div className="flex flex-wrap gap-2">
-                            {/* Generate preset buttons based on number of options */}
-                            {formData.options?.options?.length === 2 && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newOptions = [
-                                      ...(formData.options?.options || []),
-                                    ];
-                                    newOptions[0].weight = 500;
-                                    newOptions[1].weight = 500;
-                                    setFormData({
-                                      ...formData,
-                                      options: {
-                                        ...formData.options,
-                                        options: newOptions,
-                                      },
-                                    });
-                                  }}
-                                  className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
-                                >
-                                  50% / 50%
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newOptions = [
-                                      ...(formData.options?.options || []),
-                                    ];
-                                    newOptions[0].weight = 700;
-                                    newOptions[1].weight = 300;
-                                    setFormData({
-                                      ...formData,
-                                      options: {
-                                        ...formData.options,
-                                        options: newOptions,
-                                      },
-                                    });
-                                  }}
-                                  className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
-                                >
-                                  70% / 30%
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newOptions = [
-                                      ...(formData.options?.options || []),
-                                    ];
-                                    newOptions[0].weight = 300;
-                                    newOptions[1].weight = 700;
-                                    setFormData({
-                                      ...formData,
-                                      options: {
-                                        ...formData.options,
-                                        options: newOptions,
-                                      },
-                                    });
-                                  }}
-                                  className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
-                                >
-                                  30% / 70%
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newOptions = [
-                                      ...(formData.options?.options || []),
-                                    ];
-                                    newOptions[0].weight = 600;
-                                    newOptions[1].weight = 400;
-                                    setFormData({
-                                      ...formData,
-                                      options: {
-                                        ...formData.options,
-                                        options: newOptions,
-                                      },
-                                    });
-                                  }}
-                                  className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
-                                >
-                                  60% / 40%
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newOptions = [
-                                      ...(formData.options?.options || []),
-                                    ];
-                                    newOptions[0].weight = 800;
-                                    newOptions[1].weight = 200;
-                                    setFormData({
-                                      ...formData,
-                                      options: {
-                                        ...formData.options,
-                                        options: newOptions,
-                                      },
-                                    });
-                                  }}
-                                  className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
-                                >
-                                  80% / 20%
-                                </button>
-                              </>
-                            )}
-                            {formData.options?.options?.length === 3 && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newOptions = [
-                                      ...(formData.options?.options || []),
-                                    ];
-                                    newOptions[0].weight = 334;
-                                    newOptions[1].weight = 333;
-                                    newOptions[2].weight = 333;
-                                    setFormData({
-                                      ...formData,
-                                      options: {
-                                        ...formData.options,
-                                        options: newOptions,
-                                      },
-                                    });
-                                  }}
-                                  className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
-                                >
-                                  33% / 33% / 33%
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newOptions = [
-                                      ...(formData.options?.options || []),
-                                    ];
-                                    newOptions[0].weight = 500;
-                                    newOptions[1].weight = 300;
-                                    newOptions[2].weight = 200;
-                                    setFormData({
-                                      ...formData,
-                                      options: {
-                                        ...formData.options,
-                                        options: newOptions,
-                                      },
-                                    });
-                                  }}
-                                  className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
-                                >
-                                  50% / 30% / 20%
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newOptions = [
-                                      ...(formData.options?.options || []),
-                                    ];
-                                    newOptions[0].weight = 600;
-                                    newOptions[1].weight = 300;
-                                    newOptions[2].weight = 100;
-                                    setFormData({
-                                      ...formData,
-                                      options: {
-                                        ...formData.options,
-                                        options: newOptions,
-                                      },
-                                    });
-                                  }}
-                                  className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
-                                >
-                                  60% / 30% / 10%
-                                </button>
-                              </>
-                            )}
-                            {formData.options?.options?.length === 4 && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newOptions = [
-                                      ...(formData.options?.options || []),
-                                    ];
-                                    newOptions[0].weight = 250;
-                                    newOptions[1].weight = 250;
-                                    newOptions[2].weight = 250;
-                                    newOptions[3].weight = 250;
-                                    setFormData({
-                                      ...formData,
-                                      options: {
-                                        ...formData.options,
-                                        options: newOptions,
-                                      },
-                                    });
-                                  }}
-                                  className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
-                                >
-                                  25% متساوي
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newOptions = [
-                                      ...(formData.options?.options || []),
-                                    ];
-                                    newOptions[0].weight = 400;
-                                    newOptions[1].weight = 300;
-                                    newOptions[2].weight = 200;
-                                    newOptions[3].weight = 100;
-                                    setFormData({
-                                      ...formData,
-                                      options: {
-                                        ...formData.options,
-                                        options: newOptions,
-                                      },
-                                    });
-                                  }}
-                                  className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
-                                >
-                                  40% / 30% / 20% / 10%
-                                </button>
-                              </>
-                            )}
-                            {formData.options?.options?.length === 5 && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newOptions = [
-                                      ...(formData.options?.options || []),
-                                    ];
-                                    newOptions[0].weight = 200;
-                                    newOptions[1].weight = 200;
-                                    newOptions[2].weight = 200;
-                                    newOptions[3].weight = 200;
-                                    newOptions[4].weight = 200;
-                                    setFormData({
-                                      ...formData,
-                                      options: {
-                                        ...formData.options,
-                                        options: newOptions,
-                                      },
-                                    });
-                                  }}
-                                  className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
-                                >
-                                  20% متساوي
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newOptions = [
-                                      ...(formData.options?.options || []),
-                                    ];
-                                    newOptions[0].weight = 400;
-                                    newOptions[1].weight = 300;
-                                    newOptions[2].weight = 150;
-                                    newOptions[3].weight = 100;
-                                    newOptions[4].weight = 50;
-                                    setFormData({
-                                      ...formData,
-                                      options: {
-                                        ...formData.options,
-                                        options: newOptions,
-                                      },
-                                    });
-                                  }}
-                                  className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
-                                >
-                                  تنازلي
-                                </button>
-                              </>
-                            )}
-                            {/* For 6+ options, show equal distribution and descending pattern */}
-                            {formData.options?.options?.length >= 6 && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newOptions = [
-                                      ...(formData.options?.options || []),
-                                    ];
-                                    const equalWeight = Math.floor(
-                                      1000 / newOptions.length
-                                    );
-                                    const remainder =
-                                      1000 - equalWeight * newOptions.length;
-                                    newOptions.forEach((opt, idx) => {
-                                      opt.weight =
-                                        equalWeight + (idx < remainder ? 1 : 0);
-                                    });
-                                    setFormData({
-                                      ...formData,
-                                      options: {
-                                        ...formData.options,
-                                        options: newOptions,
-                                      },
-                                    });
-                                  }}
-                                  className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
-                                >
-                                  توزيع متساوي (
-                                  {Math.round(
-                                    1000 /
-                                      (formData.options?.options?.length || 1)
-                                  ) / 10}
-                                  %)
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newOptions = [
-                                      ...(formData.options?.options || []),
-                                    ];
-                                    // Create descending pattern
-                                    const count = newOptions.length;
-                                    const total = (count * (count + 1)) / 2; // Sum of 1+2+3+...+n
-                                    newOptions.forEach((opt, idx) => {
-                                      // Highest first, lowest last
-                                      const multiplier = count - idx;
-                                      opt.weight = Math.round(
-                                        (multiplier / total) * 1000
-                                      );
-                                    });
-                                    // Adjust for rounding errors
-                                    const currentTotal = newOptions.reduce(
-                                      (sum, opt) => sum + opt.weight,
-                                      0
-                                    );
-                                    if (currentTotal !== 1000) {
-                                      newOptions[0].weight +=
-                                        1000 - currentTotal;
-                                    }
-                                    setFormData({
-                                      ...formData,
-                                      options: {
-                                        ...formData.options,
-                                        options: newOptions,
-                                      },
-                                    });
-                                  }}
-                                  className="px-3 py-1.5 text-xs font-semibold bg-white border-2 border-gray-300 rounded-lg hover:bg-[#2A3984] hover:text-white hover:border-[#2A3984] transition-colors"
-                                >
-                                  توزيع تنازلي
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-semibold text-gray-700">
-                            مجموع الأوزان:
-                          </span>
-                          <span
-                            className={`text-2xl font-bold ${
-                              isWeightValid ? "text-green-600" : "text-red-600"
-                            }`}
-                          >
-                            {totalWeight}
-                          </span>
-                        </div>
-                        <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{
-                              width: `${Math.min(totalWeight / 10, 100)}%`,
-                            }}
-                            className={`h-full rounded-full ${
-                              isWeightValid
-                                ? "bg-gradient-to-r from-green-500 to-green-600"
-                                : totalWeight > 1000
-                                ? "bg-gradient-to-r from-red-500 to-red-600"
-                                : "bg-gradient-to-r from-amber-500 to-amber-600"
-                            }`}
-                          />
-                        </div>
-                        <p className="text-xs text-gray-600 flex items-center gap-1.5">
-                          {isWeightValid ? (
-                            <>
-                              <Check className="w-4 h-4 text-green-600" />
-                              ممتاز! المجموع يساوي 1000
-                            </>
-                          ) : (
-                            <>
-                              <Lightbulb className="w-4 h-4 text-amber-500" />
-                              يجب أن يكون مجموع الأوزان = 100 بالضبط
-                            </>
-                          )}
-                        </p>
+                          <Plus className="w-5 h-5" />
+                          إضافة خيار جديد
+                        </motion.button>
                       </div>
-                    )}
-
-                    <div className="space-y-3 bg-gray-50 p-4 rounded-xl border-2 border-gray-200">
-                      {(formData.options?.options || []).map(
-                        (option: any, index: number) => (
-                          <motion.div
-                            key={index}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 20 }}
-                            className="bg-white p-3 rounded-xl border-2 border-gray-200 hover:border-[#2A3984]/30 transition-all space-y-2"
-                          >
-                            <div className="flex gap-2 items-center">
-                              <div className="flex items-center justify-center w-8 h-8 bg-[#2A3984]/10 text-[#2A3984] rounded-lg font-bold text-sm shrink-0">
-                                {index + 1}
-                              </div>
-                              <input
-                                type="text"
-                                value={option.value}
-                                onChange={(e) => {
-                                  const newOptions = [
-                                    ...(formData.options?.options || []),
-                                  ];
-                                  newOptions[index].value = e.target.value;
-                                  setFormData({
-                                    ...formData,
-                                    options: {
-                                      ...formData.options,
-                                      options: newOptions,
-                                    },
-                                  });
-                                }}
-                                placeholder="القيمة (value)"
-                                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all text-sm"
-                              />
-                              <input
-                                type="text"
-                                value={option.label}
-                                onChange={(e) => {
-                                  const newOptions = [
-                                    ...(formData.options?.options || []),
-                                  ];
-                                  newOptions[index].label = e.target.value;
-                                  setFormData({
-                                    ...formData,
-                                    options: {
-                                      ...formData.options,
-                                      options: newOptions,
-                                    },
-                                  });
-                                }}
-                                placeholder="النص المعروض (label)"
-                                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all text-sm"
-                              />
-                              <motion.button
-                                type="button"
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => {
-                                  let newOptions = (
-                                    formData.options?.options || []
-                                  ).filter((_: any, i: number) => i !== index);
-
-                                  // Auto-distribute weights after deletion
-                                  newOptions =
-                                    autoDistributeWeights(newOptions);
-
-                                  setFormData({
-                                    ...formData,
-                                    options: {
-                                      ...formData.options,
-                                      options: newOptions,
-                                    },
-                                  });
-                                }}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
-                              >
-                                <Trash2 className="w-5 h-5" />
-                              </motion.button>
-                            </div>
-                            {shouldShowWeights && (
-                              <div className="flex items-center gap-3 pr-10">
-                                <label className="text-xs font-semibold text-gray-600 whitespace-nowrap">
-                                  الوزن:
-                                </label>
-                                <input
-                                  type="range"
-                                  min="0"
-                                  max="1000"
-                                  value={option.weight ?? 0}
-                                  onChange={(e) => {
-                                    const newOptions = [
-                                      ...(formData.options?.options || []),
-                                    ];
-                                    newOptions[index].weight = parseInt(
-                                      e.target.value
-                                    );
-                                    setFormData({
-                                      ...formData,
-                                      options: {
-                                        ...formData.options,
-                                        options: newOptions,
-                                      },
-                                    });
-                                  }}
-                                  className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#2A3984]"
-                                />
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max="1000"
-                                  value={option.weight ?? 0}
-                                  onChange={(e) => {
-                                    const newOptions = [
-                                      ...(formData.options?.options || []),
-                                    ];
-                                    const value = parseInt(e.target.value) || 0;
-                                    newOptions[index].weight = Math.min(
-                                      1000,
-                                      Math.max(0, value)
-                                    );
-                                    setFormData({
-                                      ...formData,
-                                      options: {
-                                        ...formData.options,
-                                        options: newOptions,
-                                      },
-                                    });
-                                  }}
-                                  className="w-20 h-8 px-2 text-center bg-[#2A3984] text-white text-sm font-bold rounded-lg border-2 border-[#2A3984] focus:outline-none focus:ring-2 focus:ring-[#2A3984]/50"
-                                />
-                              </div>
-                            )}
-                          </motion.div>
-                        )
-                      )}
-                      <motion.button
-                        type="button"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => {
-                          let newOptions = [
-                            ...(formData.options?.options || []),
-                            { value: "", label: "", weight: 0 },
-                          ];
-
-                          // Auto-distribute weights after adding
-                          newOptions = autoDistributeWeights(newOptions);
-
-                          setFormData({
-                            ...formData,
-                            options: {
-                              ...formData.options,
-                              options: newOptions,
-                            },
-                          });
-                        }}
-                        className="w-full px-4 py-3 bg-white border-2 border-dashed border-[#2A3984]/30 rounded-xl text-[#2A3984] font-semibold hover:bg-[#2A3984]/5 transition-all flex items-center justify-center gap-2"
-                      >
-                        <Plus className="w-5 h-5" />
-                        إضافة خيار جديد
-                      </motion.button>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {/* Required Toggle */}
                 <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-[#2A3984]/5 to-[#2A3984]/10 rounded-xl border-2 border-[#2A3984]/20">
