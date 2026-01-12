@@ -59,10 +59,39 @@ export function EmailVerificationModal({
         return;
       }
 
-      // If not in submissions, show error
-      setError("عذراً، هذا البريد الإلكتروني غير موجود في النظام.");
-      setLoading(false);
-      return;
+      // If not in submissions, check invitees table (new user)
+      const { data: invitees, error: inviteeError } = await supabase
+        .from("invitees")
+        .select("email");
+
+      if (inviteeError) {
+        console.error("Invitee check error:", inviteeError);
+        setError("حدث خطأ أثناء التحقق من البريد الإلكتروني.");
+        setLoading(false);
+        return;
+      }
+
+      // Check if the email exists in invitees (case-insensitive)
+      const emailExists = invitees?.some(
+        (inv) => inv.email?.toLowerCase().trim() === trimmedEmail.toLowerCase()
+      );
+
+      if (!emailExists) {
+        setError("عذراً، هذا البريد الإلكتروني غير مدرج في قائمة المدعوين.");
+        setLoading(false);
+        return;
+      }
+
+      // If email is in invitees table, send magic link
+      const { error } = await supabase.auth.signInWithOtp({
+        email: trimmedEmail,
+        options: {
+          shouldCreateUser: true,
+        },
+      });
+
+      if (error) throw error;
+      setStep("sent");
     } catch (err: any) {
       setError(err.message || "فشل إرسال رابط التحقق. حاول مرة أخرى.");
     } finally {
