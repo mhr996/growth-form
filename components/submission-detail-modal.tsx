@@ -115,8 +115,14 @@ export function SubmissionDetailModal({
               const selectedOption = field.options?.options?.find(
                 (opt: any) => opt.value === stageData[field.field_name]
               );
-              if (selectedOption?.weight) {
-                stageScore += selectedOption.weight;
+              if (selectedOption?.weight !== undefined) {
+                if (stageNum === 2) {
+                  // For Stage 2: 1000 points if correct (weight > 0), 0 if wrong
+                  stageScore += selectedOption.weight > 0 ? 1000 : 0;
+                } else {
+                  // For other stages, use weight as-is
+                  stageScore += selectedOption.weight;
+                }
               }
             }
             // Add AI evaluation scores from stage-specific AI evaluations
@@ -605,15 +611,26 @@ export function SubmissionDetailModal({
                                       field.options?.options?.find(
                                         (opt: any) => opt.value === value
                                       );
-                                    const fieldScore =
+
+                                    // For Stage 2: show 1000 or 0 based on correctness
+                                    let fieldScore =
                                       selectedOption?.weight || 0;
+                                    let isCorrect = false;
+                                    if (activeTab === 2 && hasWeight) {
+                                      isCorrect = selectedOption?.weight > 0;
+                                      fieldScore = isCorrect ? 1000 : 0;
+                                    }
 
                                     return (
                                       <div
                                         key={fieldName}
                                         className={`rounded-xl p-3 border ${
                                           hasWeight
-                                            ? "bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200"
+                                            ? activeTab === 2 && isCorrect
+                                              ? "bg-gradient-to-br from-green-50 to-emerald-50 border-green-200"
+                                              : activeTab === 2 && !isCorrect
+                                              ? "bg-gradient-to-br from-red-50 to-rose-50 border-red-200"
+                                              : "bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200"
                                             : "bg-white border-gray-200"
                                         }`}
                                       >
@@ -622,7 +639,16 @@ export function SubmissionDetailModal({
                                             {field.label}
                                           </h5>
                                           {hasWeight && (
-                                            <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white ml-2">
+                                            <span
+                                              className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-bold ml-2 ${
+                                                activeTab === 2 && isCorrect
+                                                  ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
+                                                  : activeTab === 2 &&
+                                                    !isCorrect
+                                                  ? "bg-gradient-to-r from-red-500 to-rose-500 text-white"
+                                                  : "bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+                                              }`}
+                                            >
                                               {fieldScore}
                                             </span>
                                           )}

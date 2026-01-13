@@ -135,55 +135,12 @@ export default function SubmissionsPage() {
 
   // Calculate score dynamically from field weights
   const calculateScore = (submission: Submission): number => {
-    let totalScore = 0;
+    // Calculate total score across all stages
+    const stage1Score = calculateStageScore(submission, 1);
+    const stage2Score = calculateStageScore(submission, 2);
+    const stage3Score = calculateStageScore(submission, 3);
 
-    formFields.forEach((field) => {
-      if (
-        field.has_weight &&
-        submission.data?.[field.field_name] !== undefined
-      ) {
-        const selectedOption = field.options?.options?.find(
-          (opt: any) => opt.value === submission.data[field.field_name]
-        );
-        if (selectedOption?.weight) {
-          totalScore += selectedOption.weight;
-        }
-      }
-
-      // Add AI evaluation scores
-      if (
-        field.is_ai_calculated &&
-        field.question_title &&
-        submission.ai_evaluations?.[field.question_title]
-      ) {
-        const aiEval = submission.ai_evaluations[field.question_title];
-        if (aiEval?.evaluation) {
-          const evaluation = aiEval.evaluation;
-          if (typeof evaluation === "object" && !Array.isArray(evaluation)) {
-            // Sum up all criterion results
-            const breakdownEntries = Object.entries(evaluation).filter(
-              ([key]) => !["error", "total"].includes(key)
-            );
-            const aiScore = breakdownEntries.reduce(
-              (sum, [_, data]: [string, any]) => {
-                if (
-                  typeof data === "object" &&
-                  data !== null &&
-                  typeof data.result === "number"
-                ) {
-                  return sum + data.result;
-                }
-                return sum;
-              },
-              0
-            );
-            totalScore += aiScore;
-          }
-        }
-      }
-    });
-
-    return totalScore;
+    return stage1Score + stage2Score + stage3Score;
   };
 
   // Calculate score for a specific stage
@@ -217,11 +174,14 @@ export default function SubmissionsPage() {
         const selectedOption = field.options?.options?.find(
           (opt: any) => opt.value === stageData[field.field_name]
         );
-        if (selectedOption?.weight) {
-          // For Stage 2, multiply weight by 1000 (e.g., 8% = 80 points)
-          // For other stages, use weight as-is
-          const weightMultiplier = stage === 2 ? 1000 : 1;
-          stageScore += selectedOption.weight * weightMultiplier;
+        if (selectedOption?.weight !== undefined) {
+          if (stage === 2) {
+            // For Stage 2: 1000 points if weight > 0 (correct), 0 if weight = 0 (wrong)
+            stageScore += selectedOption.weight > 0 ? 1000 : 0;
+          } else {
+            // For other stages, use weight as-is
+            stageScore += selectedOption.weight;
+          }
         }
       }
 
@@ -251,8 +211,6 @@ export default function SubmissionsPage() {
               },
               0
             );
-            // For Stage 2, AI returns pre-calculated score, add directly
-            // For other stages, add as-is
             stageScore += aiScore;
           }
         }

@@ -152,13 +152,6 @@ function SortableField({
                       مطلوب
                     </span>
                   )}
-                  {field.has_weight &&
-                    field.weight &&
-                    !field.is_ai_calculated && (
-                      <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
-                        الوزن: {field.weight}
-                      </span>
-                    )}
                   {field.is_ai_calculated && (
                     <span className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs font-medium">
                       AI تقييم
