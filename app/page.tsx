@@ -88,7 +88,7 @@ export default function Home() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("form_submissions")
-        .select("id")
+        .select("id, stage")
         .eq("user_email", user.email)
         .eq("stage", currentStep)
         .maybeSingle();
@@ -99,6 +99,20 @@ export default function Home() {
         setHasAcceptedTerms(true); // Skip welcome modal
         setShowWelcomeModal(false); // Ensure modal is closed
         setLoadingFields(true); // Keep skeleton visible for locked state
+      } else if (currentStep === 2) {
+        // For Stage 2, check if user has no submission record at all
+        // Block access if they don't have a submission record for stage 2
+        const { data: anySubmission } = await supabase
+          .from("form_submissions")
+          .select("id, stage")
+          .eq("user_email", user.email)
+          .maybeSingle();
+
+        if (!anySubmission || anySubmission.stage !== 2) {
+          // User doesn't have a stage 2 submission record, block access
+          setIsStageClosed(true);
+          setShowStageClosedModal(true);
+        }
       }
       setCheckingSubmission(false);
     };
