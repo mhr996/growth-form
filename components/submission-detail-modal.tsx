@@ -110,7 +110,12 @@ export function SubmissionDetailModal({
         if (hasData) {
           // Calculate stage score (sum of weighted fields for this stage)
           let stageScore = 0;
+
+          // Calculate scores for regular (non-AI) fields
           stageFields.forEach((field) => {
+            // Skip AI fields - we'll calculate them separately
+            if (field.is_ai_calculated) return;
+
             if (field.has_weight && stageData[field.field_name] !== undefined) {
               const selectedOption = field.options?.options?.find(
                 (opt: any) => opt.value === stageData[field.field_name]
@@ -125,13 +130,14 @@ export function SubmissionDetailModal({
                 }
               }
             }
-            // Add AI evaluation scores from stage-specific AI evaluations
-            if (
-              field.is_ai_calculated &&
-              field.question_title &&
-              stageAiEvaluations?.[field.question_title]
-            ) {
-              const aiEval = stageAiEvaluations[field.question_title];
+          });
+
+          // Add AI evaluation scores separately (once per AI question, not per field)
+          if (
+            stageAiEvaluations &&
+            Object.keys(stageAiEvaluations).length > 0
+          ) {
+            Object.values(stageAiEvaluations).forEach((aiEval: any) => {
               if (aiEval?.evaluation) {
                 // Try to extract score from AI evaluation
                 const evaluation = aiEval.evaluation;
@@ -148,9 +154,12 @@ export function SubmissionDetailModal({
                       if (
                         typeof data === "object" &&
                         data !== null &&
-                        typeof data.result === "number"
+                        typeof data.score === "number"
                       ) {
-                        return sum + data.result;
+                        // For Stage 2, use raw score. For other stages, use result
+                        const scoreToAdd =
+                          stageNum === 2 ? data.score : data.result;
+                        return sum + scoreToAdd;
                       }
                       return sum;
                     },
@@ -159,8 +168,8 @@ export function SubmissionDetailModal({
                   stageScore += aiScore;
                 }
               }
-            }
-          });
+            });
+          }
 
           stageDataMap[stageNum] = {
             stage: stageNum,

@@ -166,9 +166,13 @@ export default function SubmissionsPage() {
       stageAiEvaluations = (submission as any).ai_evaluations_stage_3 || {};
     }
 
+    // Calculate scores for regular (non-AI) fields
     formFields.forEach((field) => {
       // Only calculate for fields in this stage
       if (field.stage !== stage) return;
+
+      // Skip AI fields - we'll calculate them separately
+      if (field.is_ai_calculated) return;
 
       if (field.has_weight && stageData[field.field_name] !== undefined) {
         const selectedOption = field.options?.options?.find(
@@ -184,14 +188,11 @@ export default function SubmissionsPage() {
           }
         }
       }
+    });
 
-      // Add AI evaluation scores for this stage
-      if (
-        field.is_ai_calculated &&
-        field.question_title &&
-        stageAiEvaluations[field.question_title]
-      ) {
-        const aiEval = stageAiEvaluations[field.question_title];
+    // Add AI evaluation scores separately (once per AI question, not per field)
+    if (stageAiEvaluations && Object.keys(stageAiEvaluations).length > 0) {
+      Object.values(stageAiEvaluations).forEach((aiEval: any) => {
         if (aiEval?.evaluation) {
           const evaluation = aiEval.evaluation;
           if (typeof evaluation === "object" && !Array.isArray(evaluation)) {
@@ -203,9 +204,11 @@ export default function SubmissionsPage() {
                 if (
                   typeof data === "object" &&
                   data !== null &&
-                  typeof data.result === "number"
+                  typeof data.score === "number"
                 ) {
-                  return sum + data.result;
+                  // For Stage 2, use raw score. For other stages, use result
+                  const scoreToAdd = stage === 2 ? data.score : data.result;
+                  return sum + scoreToAdd;
                 }
                 return sum;
               },
@@ -214,8 +217,8 @@ export default function SubmissionsPage() {
             stageScore += aiScore;
           }
         }
-      }
-    });
+      });
+    }
 
     return stageScore;
   };
