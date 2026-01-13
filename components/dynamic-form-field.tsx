@@ -207,6 +207,60 @@ export function DynamicFormField({
           </div>
         );
 
+      case "file":
+        const acceptedTypes =
+          field.validation_rules?.accept || ".pdf,.doc,.docx";
+        const maxSize = field.validation_rules?.maxSize || 1 * 1024 * 1024; // 1MB default
+
+        const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+          const file = e.target.files?.[0];
+          if (!file) {
+            onChange(null);
+            return;
+          }
+
+          // Validate file size
+          if (file.size > maxSize) {
+            alert(
+              `حجم الملف كبير جداً. الحد الأقصى ${
+                maxSize / (1024 * 1024)
+              } ميجابايت`
+            );
+            e.target.value = "";
+            return;
+          }
+
+          // Store file info
+          onChange({
+            file: file,
+            name: file.name,
+            size: file.size,
+            type: file.type,
+          });
+        };
+
+        return (
+          <div className="space-y-2">
+            <input
+              type="file"
+              accept={acceptedTypes}
+              onChange={handleFileChange}
+              disabled={isDisabled}
+              required={field.is_required}
+              className={`${baseInputClasses} file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#2A3984] file:text-white hover:file:bg-[#1f2a6b] cursor-pointer`}
+            />
+            {value && value.name && (
+              <div className="text-sm text-gray-600">
+                <span className="font-medium">الملف المحدد:</span> {value.name}{" "}
+                ({(value.size / 1024).toFixed(2)} KB)
+              </div>
+            )}
+            <p className="text-xs text-gray-500">
+              الصيغ المقبولة: PDF, Word (.doc, .docx)
+            </p>
+          </div>
+        );
+
       default:
         return null;
     }
