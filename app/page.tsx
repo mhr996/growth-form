@@ -88,32 +88,49 @@ export default function Home() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("form_submissions")
-        .select("id, stage")
+        .select("id, stage, data, data_stage_2, data_stage_3")
         .eq("user_email", user.email)
-        .eq("stage", currentStep)
         .maybeSingle();
 
       if (!error && data) {
-        setHasSubmitted(true);
-        setIsFormLocked(true);
-        setHasAcceptedTerms(true); // Skip welcome modal
-        setShowWelcomeModal(false); // Ensure modal is closed
-        setLoadingFields(true); // Keep skeleton visible for locked state
-      } else if (currentStep === 2) {
-        // For Stage 2, check if user has no submission record at all
-        // Block access if they don't have a submission record for stage 2
-        const { data: anySubmission } = await supabase
-          .from("form_submissions")
-          .select("id, stage")
-          .eq("user_email", user.email)
-          .maybeSingle();
+        // Check if user has submitted data for the current stage
+        let hasSubmittedCurrentStage = false;
 
-        if (!anySubmission || anySubmission.stage !== 2) {
-          // User doesn't have a stage 2 submission record, block access
+        if (currentStep === 1 && data.stage === 1 && data.data) {
+          hasSubmittedCurrentStage = true;
+        } else if (currentStep === 2 && data.stage === 2) {
+          // For Stage 2, only lock if data_stage_2 is filled
+          if (data.data_stage_2 && Object.keys(data.data_stage_2).length > 0) {
+            hasSubmittedCurrentStage = true;
+          }
+        } else if (currentStep === 3 && data.stage === 3) {
+          // For Stage 3, only lock if data_stage_3 is filled
+          if (data.data_stage_3 && Object.keys(data.data_stage_3).length > 0) {
+            hasSubmittedCurrentStage = true;
+          }
+        }
+
+        if (hasSubmittedCurrentStage) {
+          setHasSubmitted(true);
+          setIsFormLocked(true);
+          setHasAcceptedTerms(true); // Skip welcome modal
+          setShowWelcomeModal(false); // Ensure modal is closed
+          setLoadingFields(true); // Keep skeleton visible for locked state
+        } else if (currentStep === 2 && data.stage !== 2) {
+          // For Stage 2, block access if their submission record isn't promoted to stage 2
+          setIsStageClosed(true);
+          setShowStageClosedModal(true);
+        } else if (currentStep === 3 && data.stage !== 3) {
+          // For Stage 3, block access if their submission record isn't promoted to stage 3
           setIsStageClosed(true);
           setShowStageClosedModal(true);
         }
+      } else if (currentStep === 2 || currentStep === 3) {
+        // If no submission record exists and trying to access Stage 2 or 3, block access
+        setIsStageClosed(true);
+        setShowStageClosedModal(true);
       }
+
       setCheckingSubmission(false);
     };
 
