@@ -75,6 +75,7 @@ export default function SubmissionsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<number | "all">("all");
+  const [channelFilter, setChannelFilter] = useState<string | "all">("all");
   const [filteringDecisionFilter, setFilteringDecisionFilter] = useState<
     "all" | "auto" | "exclude" | "nominated"
   >("all");
@@ -85,7 +86,14 @@ export default function SubmissionsPage() {
     useState<Submission | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [sortField, setSortField] = useState<
-    "score" | "age" | "created_at" | "stage" | null
+    | "score"
+    | "age"
+    | "created_at"
+    | "stage"
+    | "stage1_score"
+    | "stage2_score"
+    | "stage3_score"
+    | null
   >("score"); // Default to score
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [rowsPerPage, setRowsPerPage] = useState<number>(1000); // Default to 1000
@@ -231,6 +239,9 @@ export default function SubmissionsPage() {
 
     const matchesStage = stageFilter === "all" || sub.stage === stageFilter;
 
+    const matchesChannel =
+      channelFilter === "all" || sub.channel === channelFilter;
+
     const matchesFilteringDecision =
       filteringDecisionFilter === "all" ||
       (sub.filtering_decision || "auto") === filteringDecisionFilter;
@@ -245,6 +256,7 @@ export default function SubmissionsPage() {
     return (
       matchesSearch &&
       matchesStage &&
+      matchesChannel &&
       matchesFilteringDecision &&
       matchesAdvancedFilters
     );
@@ -261,6 +273,18 @@ export default function SubmissionsPage() {
       case "score":
         aValue = calculateScore(a);
         bValue = calculateScore(b);
+        break;
+      case "stage1_score":
+        aValue = calculateStageScore(a, 1);
+        bValue = calculateStageScore(b, 1);
+        break;
+      case "stage2_score":
+        aValue = calculateStageScore(a, 2);
+        bValue = calculateStageScore(b, 2);
+        break;
+      case "stage3_score":
+        aValue = calculateStageScore(a, 3);
+        bValue = calculateStageScore(b, 3);
         break;
       case "age":
         aValue = parseInt(a.data?.age) || 0;
@@ -388,7 +412,16 @@ export default function SubmissionsPage() {
     }
   };
 
-  const handleSort = (field: "score" | "age" | "created_at" | "stage") => {
+  const handleSort = (
+    field:
+      | "score"
+      | "age"
+      | "created_at"
+      | "stage"
+      | "stage1_score"
+      | "stage2_score"
+      | "stage3_score"
+  ) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
@@ -397,7 +430,16 @@ export default function SubmissionsPage() {
     }
   };
 
-  const getSortIcon = (field: "score" | "age" | "created_at" | "stage") => {
+  const getSortIcon = (
+    field:
+      | "score"
+      | "age"
+      | "created_at"
+      | "stage"
+      | "stage1_score"
+      | "stage2_score"
+      | "stage3_score"
+  ) => {
     if (sortField !== field)
       return <ArrowUpDown className="w-4 h-4 opacity-40" />;
     return sortDirection === "asc" ? (
@@ -410,6 +452,7 @@ export default function SubmissionsPage() {
   const clearAllFilters = () => {
     setSearchQuery("");
     setStageFilter("all");
+    setChannelFilter("all");
     setFilteringDecisionFilter("all");
     setAdvancedFilters({});
     setSortField("score");
@@ -419,6 +462,7 @@ export default function SubmissionsPage() {
   const hasActiveFilters =
     searchQuery !== "" ||
     stageFilter !== "all" ||
+    channelFilter !== "all" ||
     filteringDecisionFilter !== "all" ||
     Object.keys(advancedFilters).some(
       (key) => advancedFilters[key] !== "all" && advancedFilters[key] !== ""
@@ -780,6 +824,28 @@ export default function SubmissionsPage() {
               />
             </div>
 
+            {/* Channel Filter */}
+            <div className="w-full sm:w-48">
+              <CustomFilterDropdown
+                label="القناة"
+                value={channelFilter}
+                options={[
+                  { value: "all", label: `الكل (${submissions.length})` },
+                  ...Array.from(
+                    new Set(submissions.map((s) => s.channel).filter(Boolean))
+                  )
+                    .sort()
+                    .map((channel) => ({
+                      value: channel as string,
+                      label: `${channel} (${
+                        submissions.filter((s) => s.channel === channel).length
+                      })`,
+                    })),
+                ]}
+                onChange={(value) => setChannelFilter(value)}
+              />
+            </div>
+
             {/* Filtering Decision Filter */}
             <div className="w-full sm:w-48">
               <CustomFilterDropdown
@@ -889,17 +955,27 @@ export default function SubmissionsPage() {
                   </th>
                   <th
                     className="px-4 py-4 text-right text-sm font-bold cursor-pointer hover:bg-white/10 transition-colors"
-                    onClick={() => handleSort("score")}
+                    onClick={() => handleSort("stage1_score")}
                   >
                     <div className="flex items-center justify-end gap-2">
-                      المرحلة 1{getSortIcon("score")}
+                      المرحلة 1{getSortIcon("stage1_score")}
                     </div>
                   </th>
-                  <th className="px-4 py-4 text-right text-sm font-bold">
-                    المرحلة 2
+                  <th
+                    className="px-4 py-4 text-right text-sm font-bold cursor-pointer hover:bg-white/10 transition-colors"
+                    onClick={() => handleSort("stage2_score")}
+                  >
+                    <div className="flex items-center justify-end gap-2">
+                      المرحلة 2{getSortIcon("stage2_score")}
+                    </div>
                   </th>
-                  <th className="px-4 py-4 text-right text-sm font-bold">
-                    المرحلة 3
+                  <th
+                    className="px-4 py-4 text-right text-sm font-bold cursor-pointer hover:bg-white/10 transition-colors"
+                    onClick={() => handleSort("stage3_score")}
+                  >
+                    <div className="flex items-center justify-end gap-2">
+                      المرحلة 3{getSortIcon("stage3_score")}
+                    </div>
                   </th>
                   <th
                     className="px-4 py-4 text-right text-sm font-bold cursor-pointer hover:bg-white/10 transition-colors"
