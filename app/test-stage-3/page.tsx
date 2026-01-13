@@ -138,12 +138,11 @@ export default function TestStage3Page() {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-6">
-            <Image
-              src="/qatar2030.svg"
-              alt="Qatar 2030"
+            <img
+              src="https://ansjlhmmbkmytgkjpqie.supabase.co/storage/v1/object/public/images/logo.webp"
+              alt="logo"
               width={200}
               height={80}
-              priority
             />
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
