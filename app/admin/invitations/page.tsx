@@ -507,6 +507,10 @@ export default function InvitationsPage() {
                         className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-[#2A3984] focus:ring-4 focus:ring-[#2A3984]/10 transition-all"
                         placeholder="template_invitation"
                       />
+                      <p className="text-xs text-gray-500 mt-1">
+                        سيتم إضافة _m للذكور و _f للإناث تلقائياً (مثال:
+                        template_invitation_m و template_invitation_f)
+                      </p>
                     </div>
 
                     <div>

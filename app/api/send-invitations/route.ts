@@ -109,6 +109,19 @@ export async function POST(req: NextRequest) {
             formattedPhone = "966" + formattedPhone; // Add 966
           }
 
+          // Determine template name based on gender
+          // Try to get gender from invitee data or form submission
+          let templateName = settings.whatsapp_template;
+
+          // Check if invitee has gender info (from form submissions)
+          if (invitee.gender) {
+            if (invitee.gender === "male") {
+              templateName = `${settings.whatsapp_template}_m`;
+            } else if (invitee.gender === "female") {
+              templateName = `${settings.whatsapp_template}_f`;
+            }
+          }
+
           const whatsappUrl = new URL(process.env.WHATSAPP_API);
           whatsappUrl.searchParams.append(
             "token",
@@ -119,10 +132,7 @@ export async function POST(req: NextRequest) {
             process.env.WHATSAPP_SENDER_ID
           );
           whatsappUrl.searchParams.append("phone", formattedPhone);
-          whatsappUrl.searchParams.append(
-            "template",
-            settings.whatsapp_template
-          );
+          whatsappUrl.searchParams.append("template", templateName);
 
           // Always use invitee's name for param_1
           whatsappUrl.searchParams.append("param_1", invitee.name);
