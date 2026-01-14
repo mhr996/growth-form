@@ -209,13 +209,15 @@ export default function SubmissionsPage() {
             );
             const aiScore = breakdownEntries.reduce(
               (sum, [_, data]: [string, any]) => {
-                if (
-                  typeof data === "object" &&
-                  data !== null &&
-                  typeof data.score === "number"
-                ) {
-                  // Always use raw score for all stages
-                  return sum + data.score;
+                if (typeof data === "object" && data !== null) {
+                  // For Stage 3: use result instead of score
+                  if (stage === 3 && typeof data.result === "number") {
+                    return sum + data.result;
+                  }
+                  // For other stages: use score
+                  if (typeof data.score === "number") {
+                    return sum + data.score;
+                  }
                 }
                 return sum;
               },

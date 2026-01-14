@@ -151,13 +151,15 @@ export function SubmissionDetailModal({
                   );
                   const aiScore = breakdownEntries.reduce(
                     (sum, [_, data]: [string, any]) => {
-                      if (
-                        typeof data === "object" &&
-                        data !== null &&
-                        typeof data.score === "number"
-                      ) {
-                        // Always use raw score for all stages
-                        return sum + data.score;
+                      if (typeof data === "object" && data !== null) {
+                        // For Stage 3: use result instead of score
+                        if (stageNum === 3 && typeof data.result === "number") {
+                          return sum + data.result;
+                        }
+                        // For other stages: use score
+                        if (typeof data.score === "number") {
+                          return sum + data.score;
+                        }
                       }
                       return sum;
                     },
@@ -254,7 +256,7 @@ export function SubmissionDetailModal({
     return <span>{selectedOption?.label || String(value)}</span>;
   };
 
-  const renderAIEvaluation = (aiEvaluation: any) => {
+  const renderAIEvaluation = (aiEvaluation: any, stage: number = activeTab) => {
     if (!aiEvaluation) return null;
 
     const evaluation = aiEvaluation.evaluation;
@@ -272,14 +274,18 @@ export function SubmissionDetailModal({
 
       if (breakdownEntries.length > 0) {
         // Calculate total raw score (sum of all criterion scores)
+        // For Stage 3: sum results instead of scores
         const totalScore = breakdownEntries.reduce(
           (sum, [_, data]: [string, any]) => {
-            if (
-              typeof data === "object" &&
-              data !== null &&
-              typeof data.score === "number"
-            ) {
-              return sum + data.score;
+            if (typeof data === "object" && data !== null) {
+              // For Stage 3: use result if available, otherwise score
+              if (stage === 3 && typeof data.result === "number") {
+                return sum + data.result;
+              }
+              // For other stages: use score
+              if (typeof data.score === "number") {
+                return sum + data.score;
+              }
             }
             return sum;
           },
@@ -343,12 +349,11 @@ export function SubmissionDetailModal({
                           {score}
                           {scale ? ` / ${scale}` : ""}
                         </span>
-                        {/* <span className="text-xs text-gray-500">
-                          الوزن: {(weight * 100).toFixed(0)}%
-                        </span>
-                        <span className="text-xs font-bold text-green-600">
-                          النتيجة: {result.toFixed(1) / 10}
-                        </span> */}
+                        {stage === 3 && (
+                          <span className="text-xs font-bold text-green-600">
+                            النتيجة: {result}
+                          </span>
+                        )}
                       </div>
                     </div>
                     {explanation && typeof explanation === "string" && (
@@ -714,7 +719,10 @@ export function SubmissionDetailModal({
                                         </p>
                                       </div>
 
-                                      {renderAIEvaluation(aiEvaluation)}
+                                      {renderAIEvaluation(
+                                        aiEvaluation,
+                                        activeTab
+                                      )}
                                     </div>
                                   );
                                 })}
