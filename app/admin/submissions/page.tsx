@@ -214,9 +214,8 @@ export default function SubmissionsPage() {
                   data !== null &&
                   typeof data.score === "number"
                 ) {
-                  // For Stage 2, use raw score. For other stages, use result
-                  const scoreToAdd = stage === 2 ? data.score : data.result;
-                  return sum + scoreToAdd;
+                  // Always use raw score for all stages
+                  return sum + data.score;
                 }
                 return sum;
               },

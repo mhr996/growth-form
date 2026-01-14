@@ -156,10 +156,8 @@ export function SubmissionDetailModal({
                         data !== null &&
                         typeof data.score === "number"
                       ) {
-                        // For Stage 2, use raw score. For other stages, use result
-                        const scoreToAdd =
-                          stageNum === 2 ? data.score : data.result;
-                        return sum + scoreToAdd;
+                        // Always use raw score for all stages
+                        return sum + data.score;
                       }
                       return sum;
                     },
@@ -273,15 +271,15 @@ export function SubmissionDetailModal({
       );
 
       if (breakdownEntries.length > 0) {
-        // Calculate total weighted score
+        // Calculate total raw score (sum of all criterion scores)
         const totalScore = breakdownEntries.reduce(
           (sum, [_, data]: [string, any]) => {
             if (
               typeof data === "object" &&
               data !== null &&
-              typeof data.result === "number"
+              typeof data.score === "number"
             ) {
-              return sum + data.result;
+              return sum + data.score;
             }
             return sum;
           },
@@ -345,12 +343,12 @@ export function SubmissionDetailModal({
                           {score}
                           {scale ? ` / ${scale}` : ""}
                         </span>
-                        <span className="text-xs text-gray-500">
+                        {/* <span className="text-xs text-gray-500">
                           الوزن: {(weight * 100).toFixed(0)}%
                         </span>
                         <span className="text-xs font-bold text-green-600">
-                          النتيجة: {result.toFixed(1)}
-                        </span>
+                          النتيجة: {result.toFixed(1) / 10}
+                        </span> */}
                       </div>
                     </div>
                     {explanation && typeof explanation === "string" && (
