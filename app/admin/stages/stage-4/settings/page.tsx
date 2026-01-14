@@ -15,7 +15,7 @@ import { createClient } from "@/lib/supabase/client";
 type TabType = "pre-stage" | "post-stage";
 type PostStageSubTab = "passed" | "failed";
 
-export default function Stage2SettingsPage() {
+export default function Stage4SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>("post-stage");
   const [postStageSubTab, setPostStageSubTab] =
     useState<PostStageSubTab>("passed");
@@ -57,7 +57,7 @@ export default function Stage2SettingsPage() {
       const { data, error } = await supabase
         .from("stage_settings")
         .select("*")
-        .eq("stage", 2)
+        .eq("stage", 4)
         .single();
 
       if (error && error.code !== "PGRST116") throw error;
@@ -87,7 +87,7 @@ export default function Stage2SettingsPage() {
       const { data: existing } = await supabase
         .from("stage_settings")
         .select("id")
-        .eq("stage", 2)
+        .eq("stage", 4)
         .single();
 
       if (existing) {
@@ -104,12 +104,12 @@ export default function Stage2SettingsPage() {
             failed_whatsapp_image: failedWhatsappImage,
             updated_at: new Date().toISOString(),
           })
-          .eq("stage", 2);
+          .eq("stage", 4);
 
         if (error) throw error;
       } else {
         const { error } = await supabase.from("stage_settings").insert({
-          stage: 2,
+          stage: 4,
           passed_email_content: passedEmailContent,
           failed_email_content: failedEmailContent,
           passed_email_subject: passedEmailSubject,
@@ -140,7 +140,7 @@ export default function Stage2SettingsPage() {
       const { data: existing } = await supabase
         .from("stage_settings")
         .select("id")
-        .eq("stage", 2)
+        .eq("stage", 4)
         .single();
 
       if (existing) {
@@ -153,12 +153,12 @@ export default function Stage2SettingsPage() {
             pre_stage_whatsapp_image: preStageWhatsappImage,
             updated_at: new Date().toISOString(),
           })
-          .eq("stage", 2);
+          .eq("stage", 4);
 
         if (error) throw error;
       } else {
         const { error } = await supabase.from("stage_settings").insert({
-          stage: 2,
+          stage: 4,
           pre_stage_email_content: preStageEmailContent,
           pre_stage_email_subject: preStageEmailSubject,
           pre_stage_whatsapp_template: preStageWhatsappTemplate,
@@ -199,10 +199,11 @@ export default function Stage2SettingsPage() {
     setShowProgressModal(true);
 
     try {
+      // Get all submissions for this stage
       const { data: submissions, error: fetchError } = await supabase
         .from("form_submissions")
         .select("data, user_email, channel")
-        .eq("stage", 2);
+        .eq("stage", 4);
 
       if (fetchError) throw fetchError;
 
@@ -298,11 +299,11 @@ export default function Stage2SettingsPage() {
     setShowProgressModal(true);
 
     try {
+      // Count all recipients for this stage
       const { count } = await supabase
         .from("form_submissions")
         .select("user_email, channel", { count: "exact" })
-        .eq("stage", 2);
-
+        .eq("stage", 4);
       const totalRecipients = count || 0;
 
       // Initialize progress
@@ -319,7 +320,7 @@ export default function Stage2SettingsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          stage: 2,
+          stage: 4,
           settings: {
             passedEmailSubject,
             passedEmailContent,
@@ -350,7 +351,7 @@ export default function Stage2SettingsPage() {
 
       setMessage({
         type: "success",
-        text: `تم إنهاء المرحلة بنجاح! تم الإرسال: إيميلات: ${result.totalEmailsSent}، واتساب: ${result.totalWhatsappsSent}. ناجحين: ${result.nominatedCount} (تم نقلهم للمرحلة 3)، راسبين: ${result.excludedCount}`,
+        text: `تم إنهاء المرحلة بنجاح! تم الإرسال: إيميلات: ${result.totalEmailsSent}، واتساب: ${result.totalWhatsappsSent}. ناجحين: ${result.nominatedCount}، راسبين: ${result.excludedCount}`,
       });
       setTimeout(() => setMessage(null), 10000);
     } catch (error: any) {
@@ -370,7 +371,7 @@ export default function Stage2SettingsPage() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          إعدادات المرحلة الثانية
+          إعدادات المرحلة الرابعة
         </h1>
         <p className="text-gray-600">
           قم بإعداد محتوى البريد الإلكتروني وإنهاء المرحلة
@@ -421,7 +422,7 @@ export default function Stage2SettingsPage() {
               رسائل ما قبل المرحلة
               {activeTab === "pre-stage" && (
                 <motion.div
-                  layoutId="activeTab2"
+                  layoutId="activeTab4"
                   className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2A3984]"
                 />
               )}
@@ -440,7 +441,7 @@ export default function Stage2SettingsPage() {
               رسائل ما بعد المرحلة
               {activeTab === "post-stage" && (
                 <motion.div
-                  layoutId="activeTab2"
+                  layoutId="activeTab4"
                   className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2A3984]"
                 />
               )}
@@ -478,7 +479,7 @@ export default function Stage2SettingsPage() {
                     value={preStageEmailSubject}
                     onChange={(e) => setPreStageEmailSubject(e.target.value)}
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all"
-                    placeholder="مثال: إعلان هام عن المرحلة الثانية"
+                    placeholder="مثال: إعلان هام عن المرحلة الرابعة"
                   />
                 </div>
                 <div>
@@ -517,7 +518,7 @@ export default function Stage2SettingsPage() {
                       setPreStageWhatsappTemplate(e.target.value)
                     }
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#2A3984]/20 focus:border-[#2A3984] transition-all"
-                    placeholder="مثال: pre_stage_2_announcement"
+                    placeholder="مثال: pre_stage_4_announcement"
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     استخدم {"{{name}}"} في القالب ليتم استبداله باسم المستخدم
@@ -591,16 +592,16 @@ export default function Stage2SettingsPage() {
             transition={{ duration: 0.2 }}
             className="space-y-6"
           >
-            {/* Nested Sub-Tabs */}
-            <div className="flex gap-3 mb-6">
+            {/* Nested Tabs for Passed/Failed */}
+            <div className="flex gap-3">
               <button
                 onClick={() => setPostStageSubTab("passed")}
                 className={`
                   flex-1 px-6 py-3 rounded-xl font-bold transition-all
                   ${
                     postStageSubTab === "passed"
-                      ? "bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      ? "bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg scale-105"
+                      : "bg-green-100 text-green-700 hover:bg-green-200"
                   }
                 `}
               >
@@ -612,8 +613,8 @@ export default function Stage2SettingsPage() {
                   flex-1 px-6 py-3 rounded-xl font-bold transition-all
                   ${
                     postStageSubTab === "failed"
-                      ? "bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-lg"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      ? "bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-lg scale-105"
+                      : "bg-red-100 text-red-700 hover:bg-red-200"
                   }
                 `}
               >
@@ -621,7 +622,6 @@ export default function Stage2SettingsPage() {
               </button>
             </div>
 
-            {/* Sub-Tab Content */}
             <AnimatePresence mode="wait">
               {postStageSubTab === "passed" ? (
                 <motion.div
@@ -652,7 +652,7 @@ export default function Stage2SettingsPage() {
                           onChange={(e) =>
                             setPassedEmailSubject(e.target.value)
                           }
-                          className="w-full px-4 py-3 bg-white border-2 border-green-300 rounded-xl focus:ring-4 focus:ring-green-200 focus:border-green-500 transition-all"
+                          className="w-full px-4 py-3 border-2 border-green-300 rounded-xl focus:ring-4 focus:ring-green-200 focus:border-green-500 transition-all bg-white"
                           placeholder="مثال: مبروك! تم قبولك للمرحلة التالية"
                         />
                       </div>
@@ -666,7 +666,7 @@ export default function Stage2SettingsPage() {
                             setPassedEmailContent(e.target.value)
                           }
                           rows={8}
-                          className="w-full px-4 py-3 bg-white border-2 border-green-300 rounded-xl focus:ring-4 focus:ring-green-200 focus:border-green-500 transition-all resize-none"
+                          className="w-full px-4 py-3 border-2 border-green-300 rounded-xl focus:ring-4 focus:ring-green-200 focus:border-green-500 transition-all resize-none bg-white"
                           placeholder="اكتب محتوى البريد الإلكتروني هنا..."
                         />
                       </div>
@@ -693,8 +693,8 @@ export default function Stage2SettingsPage() {
                           onChange={(e) =>
                             setPassedWhatsappTemplate(e.target.value)
                           }
-                          className="w-full px-4 py-3 bg-white border-2 border-green-300 rounded-xl focus:ring-4 focus:ring-green-200 focus:border-green-500 transition-all"
-                          placeholder="مثال: stage_2_passed"
+                          className="w-full px-4 py-3 border-2 border-green-300 rounded-xl focus:ring-4 focus:ring-green-200 focus:border-green-500 transition-all bg-white"
+                          placeholder="مثال: stage_4_passed"
                         />
                         <p className="text-xs text-green-600 mt-1">
                           استخدم {"{{name}}"} في القالب ليتم استبداله باسم
@@ -711,7 +711,7 @@ export default function Stage2SettingsPage() {
                           onChange={(e) =>
                             setPassedWhatsappImage(e.target.value)
                           }
-                          className="w-full px-4 py-3 bg-white border-2 border-green-300 rounded-xl focus:ring-4 focus:ring-green-200 focus:border-green-500 transition-all"
+                          className="w-full px-4 py-3 border-2 border-green-300 rounded-xl focus:ring-4 focus:ring-green-200 focus:border-green-500 transition-all bg-white"
                           placeholder="https://example.com/image.jpg"
                         />
                       </div>
@@ -746,7 +746,7 @@ export default function Stage2SettingsPage() {
                           onChange={(e) =>
                             setFailedEmailSubject(e.target.value)
                           }
-                          className="w-full px-4 py-3 bg-white border-2 border-red-300 rounded-xl focus:ring-4 focus:ring-red-200 focus:border-red-500 transition-all"
+                          className="w-full px-4 py-3 border-2 border-red-300 rounded-xl focus:ring-4 focus:ring-red-200 focus:border-red-500 transition-all bg-white"
                           placeholder="مثال: نأسف، لم يتم قبولك في هذه المرحلة"
                         />
                       </div>
@@ -760,7 +760,7 @@ export default function Stage2SettingsPage() {
                             setFailedEmailContent(e.target.value)
                           }
                           rows={8}
-                          className="w-full px-4 py-3 bg-white border-2 border-red-300 rounded-xl focus:ring-4 focus:ring-red-200 focus:border-red-500 transition-all resize-none"
+                          className="w-full px-4 py-3 border-2 border-red-300 rounded-xl focus:ring-4 focus:ring-red-200 focus:border-red-500 transition-all resize-none bg-white"
                           placeholder="اكتب محتوى البريد الإلكتروني هنا..."
                         />
                       </div>
@@ -787,8 +787,8 @@ export default function Stage2SettingsPage() {
                           onChange={(e) =>
                             setFailedWhatsappTemplate(e.target.value)
                           }
-                          className="w-full px-4 py-3 bg-white border-2 border-red-300 rounded-xl focus:ring-4 focus:ring-red-200 focus:border-red-500 transition-all"
-                          placeholder="مثال: stage_2_failed"
+                          className="w-full px-4 py-3 border-2 border-red-300 rounded-xl focus:ring-4 focus:ring-red-200 focus:border-red-500 transition-all bg-white"
+                          placeholder="مثال: stage_4_failed"
                         />
                         <p className="text-xs text-red-600 mt-1">
                           استخدم {"{{name}}"} في القالب ليتم استبداله باسم
@@ -805,7 +805,7 @@ export default function Stage2SettingsPage() {
                           onChange={(e) =>
                             setFailedWhatsappImage(e.target.value)
                           }
-                          className="w-full px-4 py-3 bg-white border-2 border-red-300 rounded-xl focus:ring-4 focus:ring-red-200 focus:border-red-500 transition-all"
+                          className="w-full px-4 py-3 border-2 border-red-300 rounded-xl focus:ring-4 focus:ring-red-200 focus:border-red-500 transition-all bg-white"
                           placeholder="https://example.com/image.jpg"
                         />
                       </div>
@@ -884,7 +884,7 @@ export default function Stage2SettingsPage() {
                 className="w-full px-6 py-4 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
               >
                 <AlertTriangle className="w-5 h-5" />
-                <span>إنهاء المرحلة الثانية</span>
+                <span>إنهاء المرحلة الرابعة</span>
               </motion.button>
             </div>
           </motion.div>
@@ -919,7 +919,7 @@ export default function Stage2SettingsPage() {
                       تأكيد إنهاء المرحلة
                     </h3>
                     <p className="text-gray-600 text-sm">
-                      هل أنت متأكد من رغبتك في إنهاء المرحلة الثانية؟
+                      هل أنت متأكد من رغبتك في إنهاء المرحلة الرابعة؟
                     </p>
                   </div>
                   <button

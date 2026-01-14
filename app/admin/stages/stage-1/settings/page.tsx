@@ -41,15 +41,6 @@ export default function Stage1SettingsPage() {
     type: "success" | "error";
     text: string;
   } | null>(null);
-  const [channelCounts, setChannelCounts] = useState<Record<string, number>>(
-    {}
-  );
-  const [preStageSelectedChannels, setPreStageSelectedChannels] = useState<
-    string[]
-  >([]);
-  const [postStageSelectedChannels, setPostStageSelectedChannels] = useState<
-    string[]
-  >([]);
   const [sendingProgress, setSendingProgress] = useState({
     current: 0,
     total: 0,
@@ -62,65 +53,7 @@ export default function Stage1SettingsPage() {
 
   useEffect(() => {
     loadSettings();
-    fetchChannelCounts();
   }, []);
-
-  const fetchChannelCounts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("form_submissions")
-        .select("channel")
-        .eq("stage", 1)
-        .not("channel", "is", null);
-
-      if (error) throw error;
-
-      // Count submissions per channel
-      const counts: Record<string, number> = {};
-      data.forEach((s) => {
-        if (s.channel) {
-          counts[s.channel] = (counts[s.channel] || 0) + 1;
-        }
-      });
-      setChannelCounts(counts);
-    } catch (error) {
-      console.error("Error fetching channels:", error);
-    }
-  };
-
-  const togglePreStageChannel = (channel: string) => {
-    setPreStageSelectedChannels((prev) =>
-      prev.includes(channel)
-        ? prev.filter((c) => c !== channel)
-        : [...prev, channel]
-    );
-  };
-
-  const toggleAllPreStageChannels = () => {
-    const allChannels = Object.keys(channelCounts);
-    if (preStageSelectedChannels.length === allChannels.length) {
-      setPreStageSelectedChannels([]);
-    } else {
-      setPreStageSelectedChannels([...allChannels]);
-    }
-  };
-
-  const togglePostStageChannel = (channel: string) => {
-    setPostStageSelectedChannels((prev) =>
-      prev.includes(channel)
-        ? prev.filter((c) => c !== channel)
-        : [...prev, channel]
-    );
-  };
-
-  const toggleAllPostStageChannels = () => {
-    const allChannels = Object.keys(channelCounts);
-    if (postStageSelectedChannels.length === allChannels.length) {
-      setPostStageSelectedChannels([]);
-    } else {
-      setPostStageSelectedChannels([...allChannels]);
-    }
-  };
 
   const loadSettings = async () => {
     try {
@@ -269,25 +202,17 @@ export default function Stage1SettingsPage() {
     setShowProgressModal(true);
 
     try {
-      // Build query with channel filter
-      let query = supabase
+      const { data: submissions, error: fetchError } = await supabase
         .from("form_submissions")
         .select("data, user_email, channel")
         .eq("stage", 1);
-
-      // Apply channel filter if channels are selected
-      if (preStageSelectedChannels.length > 0) {
-        query = query.in("channel", preStageSelectedChannels);
-      }
-
-      const { data: submissions, error: fetchError } = await query;
 
       if (fetchError) throw fetchError;
 
       if (!submissions || submissions.length === 0) {
         setMessage({
           type: "error",
-          text: "لا يوجد مستخدمين في هذه المرحلة أو القناة المحددة",
+          text: "لا يوجد مستخدمين في هذه المرحلة",
         });
         setTimeout(() => setMessage(null), 3000);
         setSending(false);
@@ -376,18 +301,11 @@ export default function Stage1SettingsPage() {
     setShowProgressModal(true);
 
     try {
-      // Build query to count recipients with channel filter
-      let query = supabase
+      const { count } = await supabase
         .from("form_submissions")
         .select("user_email, channel", { count: "exact" })
         .eq("stage", 1);
 
-      // Apply channel filter if channels are selected
-      if (postStageSelectedChannels.length > 0) {
-        query = query.in("channel", postStageSelectedChannels);
-      }
-
-      const { count } = await query;
       const totalRecipients = count || 0;
 
       // Initialize progress
@@ -405,10 +323,6 @@ export default function Stage1SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           stage: 1,
-          channels:
-            postStageSelectedChannels.length > 0
-              ? postStageSelectedChannels
-              : undefined,
           settings: {
             passedEmailSubject,
             passedEmailContent,
@@ -439,7 +353,7 @@ export default function Stage1SettingsPage() {
 
       setMessage({
         type: "success",
-        text: `تم إنهاء المرحلة بنجاح! تم الإرسال: إيميلات: ${result.totalEmailsSent}، واتساب: ${result.totalWhatsappsSent}. ناجحين: ${result.nominatedCount}، راسبين: ${result.excludedCount}`,
+        text: `تم إنهاء المرحلة بنجاح! تم الإرسال: إيميلات: ${result.totalEmailsSent}، واتساب: ${result.totalWhatsappsSent}. ناجحين: ${result.nominatedCount} (تم نقلهم للمرحلة 2)، راسبين: ${result.excludedCount}`,
       });
       setTimeout(() => setMessage(null), 10000);
     } catch (error: any) {
@@ -549,81 +463,6 @@ export default function Stage1SettingsPage() {
             transition={{ duration: 0.2 }}
             className="space-y-6"
           >
-            {/* Channel Filter - Pre Stage */}
-            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl border-2 border-purple-300 p-6">
-              <h2 className="text-xl font-bold text-purple-900 mb-2">
-                تصفية حسب القناة
-              </h2>
-              <p className="text-sm text-purple-700 mb-4">
-                اختر القنوات التي تريد إرسال الرسائل لها (سيؤثر على الإيميل
-                والواتساب)
-              </p>
-              {Object.keys(channelCounts).length > 0 ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="pre-all-channels"
-                      checked={
-                        preStageSelectedChannels.length ===
-                        Object.keys(channelCounts).length
-                      }
-                      onChange={toggleAllPreStageChannels}
-                      className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-2 focus:ring-purple-600"
-                    />
-                    <label
-                      htmlFor="pre-all-channels"
-                      className="text-sm font-bold text-gray-900 cursor-pointer"
-                    >
-                      جميع القنوات (
-                      {Object.values(channelCounts).reduce((a, b) => a + b, 0)}{" "}
-                      مستخدم)
-                    </label>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {Object.entries(channelCounts)
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([channel, count]) => (
-                        <div
-                          key={channel}
-                          className="flex items-center gap-2 bg-white p-3 rounded-lg border border-purple-200"
-                        >
-                          <input
-                            type="checkbox"
-                            id={`pre-channel-${channel}`}
-                            checked={preStageSelectedChannels.includes(channel)}
-                            onChange={() => togglePreStageChannel(channel)}
-                            className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-2 focus:ring-purple-600"
-                          />
-                          <label
-                            htmlFor={`pre-channel-${channel}`}
-                            className="text-sm font-medium text-gray-700 cursor-pointer flex-1"
-                          >
-                            {channel}{" "}
-                            <span className="text-purple-600 font-bold">
-                              ({count})
-                            </span>
-                          </label>
-                        </div>
-                      ))}
-                  </div>
-                  {preStageSelectedChannels.length > 0 && (
-                    <p className="text-xs text-purple-700 bg-purple-100 p-2 rounded">
-                      تم اختيار {preStageSelectedChannels.length} من{" "}
-                      {Object.keys(channelCounts).length} قناة (
-                      {preStageSelectedChannels.reduce(
-                        (sum, ch) => sum + (channelCounts[ch] || 0),
-                        0
-                      )}{" "}
-                      مستخدم)
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">لا توجد قنوات متاحة</p>
-              )}
-            </div>
-
             {/* Pre-Stage Email Content */}
             <div className="bg-white rounded-2xl border-2 border-gray-200 p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-2">
@@ -755,83 +594,6 @@ export default function Stage1SettingsPage() {
             transition={{ duration: 0.2 }}
             className="space-y-6"
           >
-            {/* Channel Filter - Post Stage */}
-            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl border-2 border-purple-300 p-6">
-              <h2 className="text-xl font-bold text-purple-900 mb-2">
-                تصفية حسب القناة
-              </h2>
-              <p className="text-sm text-purple-700 mb-4">
-                اختر القنوات التي تريد إرسال الرسائل لها (سيؤثر على رسائل
-                الناجحين وغير الناجحين)
-              </p>
-              {Object.keys(channelCounts).length > 0 ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="post-all-channels"
-                      checked={
-                        postStageSelectedChannels.length ===
-                        Object.keys(channelCounts).length
-                      }
-                      onChange={toggleAllPostStageChannels}
-                      className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-2 focus:ring-purple-600"
-                    />
-                    <label
-                      htmlFor="post-all-channels"
-                      className="text-sm font-bold text-gray-900 cursor-pointer"
-                    >
-                      جميع القنوات (
-                      {Object.values(channelCounts).reduce((a, b) => a + b, 0)}{" "}
-                      مستخدم)
-                    </label>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {Object.entries(channelCounts)
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([channel, count]) => (
-                        <div
-                          key={channel}
-                          className="flex items-center gap-2 bg-white p-3 rounded-lg border border-purple-200"
-                        >
-                          <input
-                            type="checkbox"
-                            id={`post-channel-${channel}`}
-                            checked={postStageSelectedChannels.includes(
-                              channel
-                            )}
-                            onChange={() => togglePostStageChannel(channel)}
-                            className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-2 focus:ring-purple-600"
-                          />
-                          <label
-                            htmlFor={`post-channel-${channel}`}
-                            className="text-sm font-medium text-gray-700 cursor-pointer flex-1"
-                          >
-                            {channel}{" "}
-                            <span className="text-purple-600 font-bold">
-                              ({count})
-                            </span>
-                          </label>
-                        </div>
-                      ))}
-                  </div>
-                  {postStageSelectedChannels.length > 0 && (
-                    <p className="text-xs text-purple-700 bg-purple-100 p-2 rounded">
-                      تم اختيار {postStageSelectedChannels.length} من{" "}
-                      {Object.keys(channelCounts).length} قناة (
-                      {postStageSelectedChannels.reduce(
-                        (sum, ch) => sum + (channelCounts[ch] || 0),
-                        0
-                      )}{" "}
-                      مستخدم)
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">لا توجد قنوات متاحة</p>
-              )}
-            </div>
-
             {/* Sub-tabs for Passed/Failed */}
             <div className="bg-white rounded-2xl border-2 border-gray-200 p-2">
               <div className="flex gap-2">
