@@ -47,6 +47,7 @@ export default function Home() {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [checkingSubmission, setCheckingSubmission] = useState(true);
   const [isStageClosed, setIsStageClosed] = useState(false);
+  const [isStage4Eligible, setIsStage4Eligible] = useState(false);
   const { user, loading } = useAuth();
   const [formFields, setFormFields] = useState<FormFieldData[]>([]);
   const [formValues, setFormValues] = useState<Record<string, any>>({});
@@ -89,11 +90,26 @@ export default function Home() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("form_submissions")
-        .select("id, stage, data, data_stage_2, data_stage_3")
+        .select(
+          "id, stage, data, data_stage_2, data_stage_3, filtering_decision"
+        )
         .eq("user_email", user.email)
         .maybeSingle();
 
       if (!error && data) {
+        // Check if user qualifies for Stage 4 (must be at stage 4 AND nominated)
+        if (currentStep === 4) {
+          if (data.stage === 4 && data.filtering_decision === "nominated") {
+            setIsStage4Eligible(true);
+          } else {
+            // User doesn't qualify for stage 4
+            setIsStageClosed(true);
+            setShowStageClosedModal(true);
+          }
+          setCheckingSubmission(false);
+          return;
+        }
+
         // Check if user has submitted data for the current stage
         let hasSubmittedCurrentStage = false;
 
@@ -126,8 +142,8 @@ export default function Home() {
           setIsStageClosed(true);
           setShowStageClosedModal(true);
         }
-      } else if (currentStep === 2 || currentStep === 3) {
-        // If no submission record exists and trying to access Stage 2 or 3, block access
+      } else if (currentStep === 2 || currentStep === 3 || currentStep === 4) {
+        // If no submission record exists and trying to access Stage 2, 3, or 4, block access
         setIsStageClosed(true);
         setShowStageClosedModal(true);
       }
@@ -449,8 +465,15 @@ export default function Home() {
     );
   }
 
-  // If stage 4 is active and user is logged in, show Stage 4 Confirmation ONLY
-  if (currentStep === 4 && user && user.email && stageSettings && !loading) {
+  // If stage 4 is active and user is logged in AND eligible, show Stage 4 Confirmation ONLY
+  if (
+    currentStep === 4 &&
+    user &&
+    user.email &&
+    stageSettings &&
+    !loading &&
+    isStage4Eligible
+  ) {
     return (
       <Stage4Confirmation
         userEmail={user.email}
