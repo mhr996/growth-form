@@ -818,6 +818,18 @@ export default function SubmissionsPage() {
                       submissions.filter((s) => s.stage === 3).length
                     })`,
                   },
+                  {
+                    value: "4",
+                    label: `المرحلة 4 (${
+                      submissions.filter((s) => s.stage === 4).length
+                    })`,
+                  },
+                  {
+                    value: "5",
+                    label: `المرحلة 5 (${
+                      submissions.filter((s) => s.stage === 5).length
+                    })`,
+                  },
                 ]}
                 onChange={(value) =>
                   setStageFilter(value === "all" ? "all" : parseInt(value))
