@@ -6,6 +6,13 @@ import { motion } from "framer-motion";
 import { Check, Loader2, CheckCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
+const STEPS = [
+  { id: 1, label: "المعلومات الأساسية والموائمة" },
+  { id: 2, label: "الجدارات الأساسية" },
+  { id: 3, label: "التحدي الريادي" },
+  { id: 4, label: "التقييم السايكومتري" },
+];
+
 interface Stage4ConfirmationProps {
   userEmail: string;
   stageSettings: {
@@ -126,16 +133,113 @@ export function Stage4Confirmation({
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
-          className="bg-white rounded-2xl shadow-2xl w-full overflow-hidden"
+          className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden"
         >
-          {/* Header */}
-          <div className="bg-gradient-to-r from-[#2A3984] to-[#3a4a9f] py-5 px-6 text-center">
-            <h2 className="text-xl font-bold text-white mb-1">
-              المرحلة الرابعة
-            </h2>
-            <p className="text-white/90 text-sm">
-              يرجى قراءة المعلومات التالية بعناية
-            </p>
+          {/* Header with Gradient */}
+          <div className="relative bg-gradient-to-br from-[#2A3984] via-[#2A3984] to-[#1e2a5c] px-8 py-6 sm:py-8">
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLW9wYWNpdHk9IjAuMDUiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-40"></div>
+            <div className="relative">
+              <motion.h1
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="text-xl sm:text-2xl lg:text-3xl font-bold text-white text-center mb-2"
+              >
+                نموذج التسجيل في برنامج Growth Plus
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="text-white/90 text-center text-sm"
+              >
+                يرجى قراءة المعلومات التالية بعناية
+              </motion.p>
+            </div>
+          </div>
+
+          {/* Stepper */}
+          <div className="px-4 sm:px-6 py-6 border-b border-gray-100">
+            <div className="flex items-start justify-between relative max-w-4xl mx-auto">
+              {/* Progress Line */}
+              <div className="absolute right-0 top-5 sm:top-6 h-1 w-full bg-gray-100 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-[#2A3984] to-[#3a4a9f]"
+                  initial={{ width: "0%" }}
+                  animate={{ width: "100%" }}
+                  transition={{ duration: 0.5, ease: "easeInOut" }}
+                />
+              </div>
+
+              {/* Steps */}
+              {STEPS.map((step, index) => {
+                const stepNumber = index + 1;
+                const isCompleted = stepNumber < 4;
+                const isCurrent = stepNumber === 4;
+
+                return (
+                  <div
+                    key={step.id}
+                    className="flex flex-col items-center gap-1 relative z-10 flex-1"
+                  >
+                    <motion.div
+                      className={`
+                        w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-bold text-sm sm:text-base
+                        transition-all duration-300 shadow-lg
+                        ${
+                          isCompleted
+                            ? "bg-gradient-to-br from-[#2A3984] to-[#1e2a5c] text-white"
+                            : ""
+                        }
+                        ${
+                          isCurrent
+                            ? "bg-white text-[#2A3984] ring-4 ring-[#2A3984]/20 scale-110"
+                            : ""
+                        }
+                        ${
+                          !isCompleted && !isCurrent
+                            ? "bg-gray-100 text-gray-400"
+                            : ""
+                        }
+                      `}
+                      animate={{
+                        scale: isCurrent ? 1.1 : 1,
+                      }}
+                    >
+                      {isCompleted ? (
+                        <svg
+                          className="w-5 h-5 sm:w-6 sm:h-6"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={3}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      ) : (
+                        stepNumber
+                      )}
+                    </motion.div>
+                    <span
+                      className={`
+                        text-[10px] sm:text-xs font-medium text-center mt-3 px-1 leading-tight
+                        ${
+                          isCompleted || isCurrent
+                            ? "text-[#2A3984]"
+                            : "text-gray-400"
+                        }
+                      `}
+                    >
+                      {step.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Content */}
@@ -156,7 +260,7 @@ export function Stage4Confirmation({
                   type="checkbox"
                   checked={agreedToTerms}
                   onChange={(e) => setAgreedToTerms(e.target.checked)}
-                  className="mt-1 w-5 h-5 text-[#2A3984] rounded focus:ring-2 focus:ring-[#2A3984] cursor-pointer flex-shrink-0"
+                  className="mt-1 w-5 h-5 text-[#2A3984] rounded focus:ring-2 focus:ring-[#2A3984] cursor-pointer shrink-0"
                 />
                 <span className="text-sm text-red-600 group-hover:text-red-700 transition-colors leading-relaxed">
                   {stageSettings.user_agreement || ""}

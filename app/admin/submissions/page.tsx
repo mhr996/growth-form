@@ -85,6 +85,8 @@ export default function SubmissionsPage() {
   const [selectedSubmission, setSelectedSubmission] =
     useState<Submission | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [editingStageId, setEditingStageId] = useState<string | null>(null);
+  const [editingStageValue, setEditingStageValue] = useState<number>(1);
   const [sortField, setSortField] = useState<
     | "score"
     | "age"
@@ -138,6 +140,30 @@ export default function SubmissionsPage() {
       console.error("Error fetching submissions:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Update submission stage
+  const updateSubmissionStage = async (submissionId: string, newStage: number) => {
+    try {
+      const { error } = await supabase
+        .from("form_submissions")
+        .update({ stage: newStage })
+        .eq("id", submissionId);
+
+      if (error) throw error;
+
+      // Update local state
+      setSubmissions((prev) =>
+        prev.map((sub) =>
+          sub.id === submissionId ? { ...sub, stage: newStage } : sub
+        )
+      );
+      setEditingStageId(null);
+    } catch (error) {
+      console.error("Error updating stage:", error);
+      alert("فشل تحديث المرحلة");
+      setEditingStageId(null);
     }
   };
 
@@ -1048,17 +1074,46 @@ export default function SubmissionsPage() {
                       {submission.user_email}
                     </td>
                     <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${
-                          submission.stage === 1
-                            ? "bg-blue-100 text-blue-700"
-                            : submission.stage === 2
-                            ? "bg-purple-100 text-purple-700"
-                            : "bg-green-100 text-green-700"
-                        }`}
-                      >
-                        {submission.stage}
-                      </span>
+                      {editingStageId === submission.id ? (
+                        <select
+                          value={editingStageValue}
+                          onChange={(e) => {
+                            const newStage = parseInt(e.target.value);
+                            setEditingStageValue(newStage);
+                            updateSubmissionStage(submission.id, newStage);
+                          }}
+                          onBlur={() => setEditingStageId(null)}
+                          autoFocus
+                          className="px-2 py-1 text-xs font-bold rounded-lg border-2 border-[#2A3984] focus:outline-none focus:ring-2 focus:ring-[#2A3984] cursor-pointer"
+                        >
+                          <option value={1}>1</option>
+                          <option value={2}>2</option>
+                          <option value={3}>3</option>
+                          <option value={4}>4</option>
+                          <option value={5}>5</option>
+                        </select>
+                      ) : (
+                        <span
+                          onDoubleClick={() => {
+                            setEditingStageId(submission.id);
+                            setEditingStageValue(submission.stage);
+                          }}
+                          title="انقر مرتين لتعديل المرحلة"
+                          className={`inline-flex px-3 py-1 rounded-full text-xs font-bold cursor-pointer hover:opacity-80 transition-opacity ${
+                            submission.stage === 1
+                              ? "bg-blue-100 text-blue-700"
+                              : submission.stage === 2
+                              ? "bg-purple-100 text-purple-700"
+                              : submission.stage === 3
+                              ? "bg-green-100 text-green-700"
+                              : submission.stage === 4
+                              ? "bg-orange-100 text-orange-700"
+                              : "bg-teal-100 text-teal-700"
+                          }`}
+                        >
+                          {submission.stage}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {submission.data?.gender === "male"
