@@ -8,6 +8,7 @@ import { EmailVerificationModal } from "@/components/email-verification-modal";
 import { WelcomeModal } from "@/components/welcome-modal";
 import { WhatsAppTestModal } from "@/components/whatsapp-test-modal";
 import { DynamicFormField } from "@/components/dynamic-form-field";
+import { Stage4Confirmation } from "@/components/stage4-confirmation";
 import { createClient } from "@/lib/supabase/client";
 
 const STEPS = [
@@ -448,6 +449,20 @@ export default function Home() {
     );
   }
 
+  // If stage 4 is active and user is logged in, show Stage 4 Confirmation ONLY
+  if (currentStep === 4 && user && user.email && stageSettings && !loading) {
+    return (
+      <Stage4Confirmation
+        userEmail={user.email}
+        stageSettings={{
+          welcome_message: stageSettings.welcome_message,
+          user_agreement: stageSettings.user_agreement,
+          success_message: stageSettings.success_message,
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Welcome Modal */}
@@ -535,7 +550,11 @@ export default function Home() {
                   <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                    transition={{
+                      delay: 0.2,
+                      type: "spring",
+                      stiffness: 200,
+                    }}
                     className="flex justify-center mb-8"
                   >
                     <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center shadow-2xl">
@@ -958,15 +977,6 @@ export default function Home() {
       <EmailVerificationModal
         isOpen={showVerificationModal}
         onVerified={() => setShowVerificationModal(false)}
-      />
-      <WelcomeModal
-        isOpen={showWelcomeModal}
-        onAccept={() => {
-          setHasAcceptedTerms(true);
-          setShowWelcomeModal(false);
-        }}
-        welcomeMessage={stageSettings?.welcome_message || ""}
-        userAgreement={stageSettings?.user_agreement || ""}
       />
 
       {/* Stage Closed Modal */}

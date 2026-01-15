@@ -31,6 +31,7 @@ const navigation = [
       { name: "المرحلة 1", href: "/admin/stages/stage-1" },
       { name: "المرحلة 2", href: "/admin/stages/stage-2" },
       { name: "المرحلة 3", href: "/admin/stages/stage-3" },
+      { name: "المرحلة 4", href: "/admin/stages/stage-4" },
     ],
   },
   { name: "إدارة الدعوات", href: "/admin/invitations", icon: Mail },

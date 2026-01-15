@@ -109,8 +109,8 @@ export default function SettingsPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 mb-8">
-              {[1, 2, 3].map((stage) => (
+            <div className="grid grid-cols-4 gap-4 mb-8">
+              {[1, 2, 3, 4].map((stage) => (
                 <button
                   key={stage}
                   onClick={() => setActiveStage(stage)}
